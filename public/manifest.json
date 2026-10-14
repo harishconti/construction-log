@@ -3,8 +3,16 @@
   "short_name": "Build Ledger",
   "description": "Track expenses, diary entries, and budgets for your build.",
   "start_url": "/projects",
+  "scope": "/",
   "display": "standalone",
   "background_color": "#f8fafc",
   "theme_color": "#2563eb",
-  "icons": []
+  "icons": [
+    {
+      "src": "/icon.svg",
+      "sizes": "any",
+      "type": "image/svg+xml",
+      "purpose": "any maskable"
+    }
+  ]
 }

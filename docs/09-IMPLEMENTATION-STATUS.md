@@ -38,6 +38,12 @@ Migrations: `init`, `attachment_parent_check`, `idempotency_response`, `object_d
 | Uploads | `POST /api/uploads/presign`; `POST /api/uploads/:attachmentId/finalize`; `DELETE /api/attachments/:id` |
 | Maintenance | `GET/POST /api/maintenance/cleanup` (secret-protected) |
 
+## UI pages (implemented)
+`/login` (Neon Auth) · `/projects` (list/create) · `/projects/:id` (Dashboard + chart) ·
+`/transactions` · `/diary` · `/budgets` · `/members` (admin) · `/settings` (admin, project + categories).
+Nav: mobile bottom tabs / desktop sidebar; admin-only links for Members and Settings.
+PWA: `manifest.json` + service worker (`public/sw.js`, registered in production).
+
 ## Behaviour implemented
 - **Auth**: Neon Auth sign-up/in via same-origin proxy; server `getSession`; user mirror upsert.
 - **Authorization**: `requireRole(projectId, userId, minRole)` on every route; project isolation via `projectId` scoping; last-admin safeguard; editor-any transaction edits (admin-only delete/restore); diary author/admin edits, admin delete.
@@ -52,14 +58,12 @@ Migrations: `init`, `attachment_parent_check`, `idempotency_response`, `object_d
 - Manual e2e against a real Neon project + R2 bucket: auth sign-up/session; project/category/transaction/diary/budget CRUD; optimistic-lock 409; idempotent replay; two-phase upload (PUT→finalize→link); attachment delete; budgets variance + revision history; timeline merge; dashboard totals; cleanup reap+delete.
 
 ## Not yet implemented (backlog)
-1. **UI pages**: Members management and Project settings/categories screens (APIs exist; nav links absent).
-2. **PWA**: `manifest.json` present; service worker + registration not yet added.
-3. **Members invite UX**: invite requires the invitee to have signed up first; no email invite flow.
-4. **Neon Auth config**: add trusted origins (`https://build.harishspace.in`, preview), review sign-up controls.
-5. **R2 CORS**: allow `localhost:3000` (+ production origin) for PUT/GET/HEAD.
-6. **Release process**: production `prisma migrate deploy`; encrypted backups (7 daily / 4 weekly); separate prod bucket/credentials.
-7. **Dev/prod isolation**: local dev currently targets the default (production) Neon branch — create a `dev` branch.
-8. **Optional**: diary edit/delete UI, transaction soft-delete/restore UI, attachments preview/lightbox.
+1. **Members invite UX**: invite requires the invitee to have signed up first; no email invite flow.
+2. **Neon Auth config**: add trusted origins (`https://build.harishspace.in`, preview), review sign-up controls.
+3. **R2 CORS**: allow `localhost:3000` (+ production origin) for PUT/GET/HEAD.
+4. **Release process**: production `prisma migrate deploy`; encrypted backups (7 daily / 4 weekly); separate prod bucket/credentials.
+5. **Dev/prod isolation**: local dev currently targets the default (production) Neon branch — create a `dev` branch.
+6. **Optional UI**: diary edit/delete UI, transaction soft-delete/restore UI, attachment preview/lightbox.
 
 ## Environment variables
 `DATABASE_URL`, `DIRECT_URL`, `NEON_AUTH_BASE_URL`, `NEON_AUTH_COOKIE_SECRET`, `NEXT_PUBLIC_APP_URL`

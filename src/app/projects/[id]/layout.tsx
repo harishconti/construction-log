@@ -30,7 +30,10 @@ export default async function ProjectLayout({
   if (!membership) redirect('/projects');
 
   const base = `/projects/${id}`;
-  const nav = membership.role === 'admin' ? [...NAV, { href: '/members', label: 'Members' }] : NAV;
+  const nav =
+    membership.role === 'admin'
+      ? [...NAV, { href: '/members', label: 'Members' }, { href: '/settings', label: 'Settings' }]
+      : NAV;
 
   return (
     <div className="min-h-screen sm:flex">
