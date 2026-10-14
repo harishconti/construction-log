@@ -27,6 +27,9 @@ src/lib/            Server logic: prisma, auth, requireRole, audit, r2, idempote
 prisma/             schema.prisma, seed.ts, migrations/
 scripts/            db-backup.mjs, db-restore.mjs
 tests/              Vitest unit tests
+e2e/                Playwright e2e (public read-only tier + opt-in authed tier)
 .github/workflows/  CI (lint, typecheck, test, build)
 docs/               This folder
+CLAUDE.md           Agent guide: commands, conventions, non-negotiable rules
+.claude/skills/     Project skills: new-api-route, prisma-migration, ui-screen, release, testing, e2e-testing
 ```

@@ -40,7 +40,7 @@ diary/observations, and weekly/monthly budgets for a personal house-construction
 ## Tech Stack (locked)
 | Layer | Choice |
 |---|---|
-| Frontend + Backend | Next.js (App Router), TypeScript, React 18 |
+| Frontend + Backend | Next.js (App Router), TypeScript, React 19 |
 | Styling | Tailwind CSS |
 | DB ORM | Prisma |
 | Database | Neon PostgreSQL (serverless; pooled `DATABASE_URL`, direct `DIRECT_URL` for migrations) |
