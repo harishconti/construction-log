@@ -18,8 +18,15 @@ export function DashboardChart({ data }: { data: ChartDatum[] }) {
           <CartesianGrid strokeDasharray="3 3" horizontal={false} />
           <XAxis type="number" tick={{ fontSize: 12 }} tickFormatter={(value) => formatINR(Number(value), { compact: true })} />
           <YAxis type="category" dataKey="name" width={92} tick={{ fontSize: 12 }} />
-          <Tooltip formatter={(value) => formatINR(Number(value))} />
-          <Legend />
+          {/* Recharts colours tooltip/legend text with the series fill; the pale "Planned" fill is unreadable. */}
+          <Tooltip
+            formatter={(value) => formatINR(Number(value))}
+            cursor={{ fill: 'var(--surface-2)' }}
+            contentStyle={{ background: 'var(--surface)', border: '1px solid var(--border)', borderRadius: 8 }}
+            labelStyle={{ color: 'var(--ink)', fontWeight: 600 }}
+            itemStyle={{ color: 'var(--ink-2)' }}
+          />
+          <Legend formatter={(value) => <span style={{ color: 'var(--ink-2)' }}>{value}</span>} />
           <Bar dataKey="planned" name="Planned" fill="var(--primary-tint)" stroke="var(--primary)" radius={[0, 4, 4, 0]} />
           <Bar dataKey="actual" name="Actual" fill="var(--primary)" radius={[0, 4, 4, 0]} />
         </BarChart>

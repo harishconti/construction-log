@@ -172,7 +172,8 @@ export function MembersView({ projectId, currentUserId }: { projectId: string; c
                     value={m.role}
                     onChange={(e) => changeRole(m.user.id, e.target.value as Role)}
                     disabled={m.user.id === currentUserId}
-                    className="!h-9 !w-auto"
+                    aria-label={`Role for ${m.user.name}`}
+                    className="!w-auto"
                   >
                     {ROLES.map((r) => (
                       <option key={r} value={r}>

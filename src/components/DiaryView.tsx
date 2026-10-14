@@ -186,14 +186,14 @@ export function DiaryView({
                       }`}
                     >
                       <div className="flex items-start justify-between gap-2">
-                        <h3 className="min-w-0 pt-2.5 font-medium">{e.title}</h3>
+                        <h3 className="min-w-0 pt-2.5 font-medium [overflow-wrap:anywhere]">{e.title}</h3>
                         {editable && (
                           <IconButton label={`Edit ${e.title}`} onClick={() => setSheet({ open: true, entry: e })} className="-mr-2 -mt-1 shrink-0">
                             <Pencil size={18} />
                           </IconButton>
                         )}
                       </div>
-                      {e.body && <p className="mt-1 whitespace-pre-wrap text-sm text-ink-2">{e.body}</p>}
+                      {e.body && <p className="mt-1 whitespace-pre-wrap text-sm text-ink-2 [overflow-wrap:anywhere]">{e.body}</p>}
                       <div className="md:max-w-xl">
                         <AttachmentList attachments={e.attachments} layout="grid" />
                       </div>

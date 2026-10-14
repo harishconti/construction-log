@@ -67,9 +67,11 @@ export default async function ProjectsPage() {
         <SignOutButton />
       </header>
 
-      <section className="mt-4 flex justify-end">
-        <NewProjectForm />
-      </section>
+      {memberships.length > 0 && (
+        <section className="mt-4 flex justify-end">
+          <NewProjectForm />
+        </section>
+      )}
 
       <section className="mt-4 grid gap-3 md:grid-cols-2">
         {memberships.length === 0 ? (
@@ -83,10 +85,10 @@ export default async function ProjectsPage() {
               <Link
                 key={m.project.id}
                 href={`/projects/${m.project.id}`}
-                className="block min-h-11 rounded-lg border border-border bg-surface p-4 transition hover:border-border-strong hover:shadow-e1"
+                className="block min-h-11 min-w-0 rounded-lg border border-border bg-surface p-4 transition hover:border-border-strong hover:shadow-e1"
               >
                 <div className="flex items-center justify-between gap-2">
-                  <span className="truncate font-display text-lg font-semibold">{m.project.name}</span>
+                  <span className="min-w-0 truncate font-display text-lg font-semibold">{m.project.name}</span>
                   <span className="flex shrink-0 items-center gap-2">
                     <span className="rounded-full bg-surface-2 px-2 py-0.5 text-xs text-ink-2">{ROLE_LABEL[m.role] ?? m.role}</span>
                     <span className={`rounded-full px-2 py-0.5 text-xs font-medium ${STATUS_CLASS[m.project.status] ?? 'bg-surface-2 text-ink-2'}`}>

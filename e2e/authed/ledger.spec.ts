@@ -119,6 +119,15 @@ test('add a diary entry', async ({ page }) => {
   await expect(page.getByText('Entry added')).toBeVisible();
 });
 
+test('no page scrolls sideways on mobile (long project/vendor names)', async ({ page }) => {
+  for (const path of ['/projects', '', '/transactions', '/timeline', '/diary', '/budgets', '/more', '/members', '/settings']) {
+    await page.goto(path === '/projects' ? path : `/projects/${projectId}${path}`);
+    await page.waitForLoadState('networkidle');
+    const overflow = await page.evaluate(() => document.documentElement.scrollWidth - document.documentElement.clientWidth);
+    expect(overflow, `horizontal overflow on ${path || 'dashboard'}`).toBeLessThanOrEqual(0);
+  }
+});
+
 test('project isolation: other ids are 404, never another project’s data', async ({ request }) => {
   const res = await request.get('/api/projects/does-not-exist/transactions');
   expect(res.status()).toBe(404);

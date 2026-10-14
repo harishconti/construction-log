@@ -63,15 +63,16 @@ PWA: `manifest.json` + service worker (`public/sw.js`, registered in production)
 - **Maintenance**: reaps `pending` uploads older than 24h and retries deferred R2 deletions (attempt cap + TTL).
 
 ## Verification
-- `npm run typecheck`, `npm run lint`, `npm test` (**97 unit tests**: roles, validation, period/budget
+- `npm run typecheck`, `npm run lint`, `npm test` (**104 unit tests**: roles, validation, period/budget
   math, maintenance auth, file policy, audit regressions, API error mapping/pagination, API client,
   INR/IST formatting, and server guards — `requireRole`, rate limit, audit write, idempotency,
-  attachment linking — with Prisma mocked), `npm run build` — all green.
+  attachment linking, user-mirror first-sign-in race — with Prisma mocked), `npm run build` — all green.
 - **Playwright e2e** (`npm run test:e2e`, runs in CI): public tier on desktop + Pixel 7 — login UI,
   axe WCAG A/AA in light and dark, auth redirects, every API route → 401, maintenance secret, health
   shape, security headers/CSP, PWA manifest/icons, service worker (84 tests, all passing). Authed tier
-  (`e2e/authed/`, project/expense/diary flows, version conflict, idempotency, GST rule) is opt-in via
-  `E2E_ALLOW_WRITES=1` and must target a non-production Neon branch.
+  (`e2e/authed/`: project/expense/diary flows, version conflict, idempotency, GST rule, no sideways
+  scroll on mobile, soft-delete exclusion from totals + restore, budget upsert/variance status/
+  revisions, invitations, last-admin guard) is opt-in via `E2E_ALLOW_WRITES=1` and must target a non-production Neon branch.
 - Manual e2e against a real Neon project + R2 bucket: auth sign-up/session; project/category/transaction/
   diary/budget CRUD; optimistic-lock 409; idempotent replay; two-phase upload (PUT→finalize→link);
   attachment delete; budgets variance + revision history; timeline merge; dashboard totals; cleanup
@@ -150,6 +151,18 @@ diary creates / invites; DB `CHECK` constraints for enum-like columns; magic-byt
 finalize; and dependency upgrades — **React 19**, **Recharts 3**, **Vitest 5** (clears the dev-only
 advisories). React 18 deprecation is resolved. Prisma remains 5.x (driver-adapter/Neon-serverless is a
 future consideration).
+
+**UI test pass (14 Oct 2026)** — full exploratory run against a local Postgres + stub Neon Auth upstream:
+every screen × admin/editor/viewer × desktop/mobile × light/dark (axe, console errors, 5xx, overflow,
+unlabelled controls) plus scripted flows (login errors, sign-up, invites/role change/removal, settings,
+expense validation/search/filters/edit/delete/undo/restore, budgets set/revise/period stepping, diary
+CRUD, timeline deep links, role permissions in UI and API). Fixed: first-sign-in P2002 race in the user
+mirror and invitation claim (500 on a new user's first page load); duplicate "New project" button on the
+empty projects page; unlabelled Start date (New project), member role selects and inline category
+rename; progress bars without accessible names; unreadable chart tooltip/legend ("Planned" series
+colour); budget Revise/Set targets under 44px; long names/URLs causing sideways scroll on mobile
+(projects list, dashboard recent cards, diary); client-side GST > amount message instead of the raw
+`gstAmount:` validation string. Not covered locally: R2 uploads, Google sign-in, magic link.
 
 ## Not yet implemented (backlog)
 1. **Magic link**: UI is wired (`signIn.magicLink`), but the branch reports `magicLink.enabled: false`

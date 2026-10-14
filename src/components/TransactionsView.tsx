@@ -738,6 +738,10 @@ function TransactionSheet({
       setError('Retry or remove the files that failed to upload.');
       return;
     }
+    if (Number(gstAmount || 0) > Number(amount)) {
+      setError('GST can’t be more than the amount (GST is included in it).');
+      return;
+    }
     setPending(true);
     try {
       if (entry) {

@@ -7,7 +7,7 @@ import { api } from '@/lib/api-client';
 import { Button } from '@/components/ui/Button';
 import { Sheet } from '@/components/ui/Sheet';
 import { Alert } from '@/components/ui/Alert';
-import { Field, TextInput, Textarea } from '@/components/ui/inputs';
+import { DateInput, Field, TextInput, Textarea } from '@/components/ui/inputs';
 import { todayIST } from '@/lib/period';
 
 export function NewProjectForm() {
@@ -70,13 +70,7 @@ export function NewProjectForm() {
             <Textarea value={description} onChange={(e) => setDescription(e.target.value)} rows={2} />
           </Field>
           <Field label="Start date">
-            <input
-              type="date"
-              value={startDate}
-              max={todayIST()}
-              onChange={(e) => setStartDate(e.target.value)}
-              className="h-11 w-full rounded-md border border-border-strong bg-surface px-3 text-base text-ink md:text-sm"
-            />
+            <DateInput value={startDate} max={todayIST()} onChange={(e) => setStartDate(e.target.value)} />
           </Field>
           {error && <Alert message={error} />}
         </form>
