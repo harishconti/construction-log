@@ -59,6 +59,26 @@ npx prisma migrate deploy    # production / CI
 > is unset. The **deployed runtime** still needs `NEON_AUTH_BASE_URL`, `NEON_AUTH_COOKIE_SECRET`,
 > `DIRECT_URL` and the `R2_*` values, or auth/upload routes will error. Node is pinned to `22.x`.
 
+### If the Neon integration used a prefix (`construction_*`)
+Neon's Vercel integration can inject variables with a prefix; the app expects **unprefixed** names.
+Cleanest is to reconnect Neon without a prefix. Otherwise, in Vercel → Environment Variables:
+
+**Rename (keep value, change key):**
+- `construction_DATABASE_URL` → `DATABASE_URL`
+- `construction_DATABASE_URL_UNPOOLED` → `DIRECT_URL`
+- `construction_NEON_AUTH_BASE_URL` → `NEON_AUTH_BASE_URL`
+
+**Delete (unused by the app):** `construction_POSTGRES_USER`, `construction_POSTGRES_PASSWORD`,
+`construction_POSTGRES_HOST`, `construction_POSTGRES_DATABASE`, `construction_POSTGRES_URL`,
+`construction_POSTGRES_URL_NON_POOLING`, `construction_POSTGRES_URL_NO_SSL`,
+`construction_POSTGRES_PRISMA_URL`, `construction_PGHOST`, `construction_PGHOST_UNPOOLED`,
+`construction_PGUSER`, `construction_PGPASSWORD`, `construction_PGDATABASE`,
+`construction_VITE_NEON_AUTH_URL`, `construction_NEON_PROJECT_ID`.
+
+**Add (missing):** `NEON_AUTH_COOKIE_SECRET` (`openssl rand -base64 32`), `R2_ACCOUNT_ID`,
+`R2_ENDPOINT`, `R2_ACCESS_KEY_ID`, `R2_SECRET_ACCESS_KEY`, `R2_BUCKET` (`construction-ledger-dev`),
+`R2_REGION` (`auto`). Optional: `MAINTENANCE_SECRET` (or `CRON_SECRET`) for the cleanup cron.
+
 ## 4. Build & release
 1. Run `npm run lint`, `npm run typecheck`, `npm test`, `npm run build` locally — all must pass.
 2. Take a database backup.
