@@ -2,6 +2,7 @@
 
 import { useCallback, useEffect, useState } from 'react';
 import { api } from '@/lib/api-client';
+import { todayIST } from '@/lib/period';
 import { AttachmentList, type AttachmentItem } from '@/components/AttachmentList';
 
 type Category = { id: string; name: string; type: string };
@@ -339,7 +340,7 @@ function TransactionForm({
 }) {
   const [categoryId, setCategoryId] = useState(entry?.category.id ?? '');
   const [occurredAt, setOccurredAt] = useState(() =>
-    entry ? entry.occurredAt.slice(0, 10) : new Date().toISOString().slice(0, 10),
+    entry ? entry.occurredAt.slice(0, 10) : todayIST(),
   );
   const [amount, setAmount] = useState(entry ? Number(entry.amount).toString() : '');
   const [gstAmount, setGstAmount] = useState(entry ? Number(entry.gstAmount).toString() : '0');
@@ -442,7 +443,7 @@ function TransactionForm({
           <input
             type="date"
             value={occurredAt}
-            max={new Date().toISOString().slice(0, 10)}
+            max={todayIST()}
             onChange={(e) => setOccurredAt(e.target.value)}
             className="mt-1 w-full rounded-lg border border-slate-300 px-3 py-2"
           />

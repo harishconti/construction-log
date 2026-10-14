@@ -45,8 +45,12 @@ viewer on another. Every check is server-side and re-reads membership from the d
    `MAINTENANCE_SECRET`/`CRON_SECRET` and is not part of the per-project role model. It denies with
    401 when no secret is configured and never returns project data to unauthenticated callers.
 10. **Invitations** — an admin may invite an email that has no account yet; the pending invitation is
-    claimed automatically on that person's first sign-in and the stored role is applied. The project
-    creator is its first admin. New sign-ups still receive no membership on their own.
+    claimed automatically on that person's first sign-in and the stored role is applied. Invitations
+    **expire** (default 14 days). The project creator is its first admin. New sign-ups still receive no
+    membership on their own.
+    - **Accepted residual risk:** claiming matches on email only (email verification is not required),
+      so anyone who controls an invited address could claim that invitation before the intended person.
+      Mitigation if needed later: require a verified email (or tokenised invite links) before claiming.
 
 ## Acceptance Checks (must hold)
 - [ ] Viewer POST/PATCH/DELETE denied even via manual API calls.

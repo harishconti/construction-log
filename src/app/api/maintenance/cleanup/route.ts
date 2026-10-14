@@ -17,22 +17,31 @@ const run = handle(async (req) => {
 
   const now = Date.now();
 
-  // 1) Reap stale pending uploads (never finalized) and queue their objects for deletion.
-  const stalePending = await prisma.attachment.findMany({
-    where: { status: 'pending', uploadedAt: { lt: new Date(now - PENDING_TTL_MS) } },
+  // 1) Reap stale uploads: never-finalized (`pending`) and finalized-but-never-linked (`ready`),
+  //    both older than the TTL. Queue their objects for deletion and remove the rows.
+  const stale = await prisma.attachment.findMany({
+    where: {
+      uploadedAt: { lt: new Date(now - PENDING_TTL_MS) },
+      OR: [
+        { status: 'pending' },
+        { status: 'ready', transactionId: null, diaryEntryId: null },
+      ],
+    },
     orderBy: { uploadedAt: 'asc' },
     take: 500,
     select: { id: true, projectId: true, fileKey: true },
   });
-  if (stalePending.length) {
-    await prisma.objectDeletion.createMany({
-      data: stalePending.map((a) => ({
-        projectId: a.projectId,
-        fileKey: a.fileKey,
-        lastError: 'stale pending upload',
-      })),
+  if (stale.length) {
+    await prisma.$transaction(async (tx) => {
+      await tx.objectDeletion.createMany({
+        data: stale.map((a) => ({
+          projectId: a.projectId,
+          fileKey: a.fileKey,
+          lastError: 'stale unlinked upload',
+        })),
+      });
+      await tx.attachment.deleteMany({ where: { id: { in: stale.map((a) => a.id) } } });
     });
-    await prisma.attachment.deleteMany({ where: { id: { in: stalePending.map((a) => a.id) } } });
   }
 
   // 2) Retry deferred R2 deletions (bounded attempts, plus retry anything older than the TTL).
@@ -60,7 +69,7 @@ const run = handle(async (req) => {
   }
 
   return json({
-    cleanedPending: stalePending.length,
+    cleanedAttachments: stale.length,
     deletedObjects: deleted,
     failedDeletions: failed,
     at: new Date().toISOString(),

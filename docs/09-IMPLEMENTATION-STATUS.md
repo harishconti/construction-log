@@ -8,7 +8,7 @@ This document reflects the **actual repository state**. For the target design se
 - **Prisma** with pooled `DATABASE_URL` + direct `DIRECT_URL` (`directUrl`); schema managed via `prisma/migrations`.
 - **Neon Auth** (Managed Better Auth) via `@neondatabase/auth`; session cookies; users mirrored locally.
 - **Cloudflare R2** private bucket, presigned PUT/GET, two-phase upload.
-- **Vercel** target; `build` runs `prisma generate && next build`; Node `>=20.9.0`; daily cleanup cron (`vercel.json`).
+- **Vercel** target; `build` runs `prisma generate && next build`; Node `22.x`; daily cleanup cron (`vercel.json`).
 
 ## Data model (implemented)
 `User, Project, ProjectMember, Category, Transaction, DiaryEntry, Attachment, Budget, BudgetRevision,
@@ -22,7 +22,8 @@ Key properties in place:
 - `IdempotencyKey` stores the response for replay.
 - `ObjectDeletion` retry queue for deferred R2 deletions.
 
-Migrations: `init`, `attachment_parent_check`, `idempotency_response`, `object_deletion_queue`.
+Migrations: `init`, `attachment_parent_check`, `idempotency_response`, `object_deletion_queue`,
+`attachment_original_name`, `invitations`, `invitation_expiry`.
 
 ## API endpoints (implemented)
 | Area | Endpoints |
@@ -68,6 +69,22 @@ PWA: `manifest.json` + service worker (`public/sw.js`, registered in production)
   diary/budget CRUD; optimistic-lock 409; idempotent replay; two-phase upload (PUT→finalize→link);
   attachment delete; budgets variance + revision history; timeline merge; dashboard totals; cleanup
   reap+delete; document upload + forced-download headers + rejected HTML; unauth download 401.
+
+## Audit remediation
+Tracking fixes for `11-AUDIT.md` (backend) and `12-DESIGN-AUDIT.md` (design).
+
+**Batch A1 — done** (correctness & security):
+`#1` invitation expiry (14d; email-match claim risk accepted & documented) · `#2` atomic idempotency
+(advisory lock, run-in-transaction) · `#3` conditional attachment linking · `#4` finalize is idempotent
+and refuses relink/deleted parents · `#5` diary delete queues R2 objects · `#6` cleanup reaps orphaned
+`ready` uploads · `#7` seed uses IST month start · `#8` last-admin guard is serializable · `#9`
+`todayIST()` for form dates · `#10–12` Prisma P2002→409/P2025→404/P2034→409, date-param validation
+(422), money bounds + 2-decimal rule.
+
+**Batch A2 — pending:** timeline keyset pagination, inactive categories in reports/edit, server-side
+file-count cap, budgets POST upsert/version, UI idempotency-key reuse, per-request DB cost,
+cleanup/idempotency-key hygiene, CI on all branches + API tests. **A3 & B5–B6 pending** (hardening,
+dependency upgrades, dashboard/budgets rework, polish).
 
 ## Not yet implemented (backlog)
 1. **Magic link**: UI is wired (`signIn.magicLink`), but the branch reports `magicLink.enabled: false`

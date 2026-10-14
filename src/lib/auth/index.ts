@@ -37,10 +37,10 @@ async function mirrorUser(u: NeonUser): Promise<AppUser> {
   return user;
 }
 
-/** Applies any pending email invitations once the account exists. Idempotent and cheap when empty. */
+/** Applies any non-expired pending email invitations once the account exists. Idempotent and cheap when empty. */
 async function claimInvitations(user: { id: string; email: string }): Promise<void> {
   const invitations = await prisma.invitation.findMany({
-    where: { email: user.email },
+    where: { email: user.email, expiresAt: { gt: new Date() } },
     select: { projectId: true, role: true },
   });
   if (invitations.length === 0) return;

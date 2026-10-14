@@ -4,27 +4,44 @@ import { ApiError } from './api';
 type Parent = 'transaction' | 'diary';
 
 /**
- * Links finalized (status=ready) attachments to a parent record. Every attachment must belong to
- * the same project, be finalized, and not already be attached. Enforces the exactly-one-parent rule.
+ * Links finalized (status=ready) attachments to a parent record.
+ *
+ * The update is guarded in a single statement so a concurrent writer cannot relink the same
+ * attachment: only rows that are still `ready` and unlinked are updated, and a count mismatch means
+ * someone else claimed one first.
  */
 export async function linkAttachments(
   tx: Prisma.TransactionClient,
   opts: { projectId: string; parent: Parent; parentId: string; attachmentIds: string[] },
 ): Promise<void> {
-  const field = opts.parent === 'transaction' ? 'transactionId' : 'diaryEntryId';
-  const attachments = await tx.attachment.findMany({ where: { id: { in: opts.attachmentIds } } });
+  if (opts.attachmentIds.length === 0) return;
 
-  if (attachments.length !== opts.attachmentIds.length) {
+  const field = opts.parent === 'transaction' ? 'transactionId' : 'diaryEntryId';
+
+  const existing = await tx.attachment.findMany({
+    where: { id: { in: opts.attachmentIds } },
+    select: { id: true, projectId: true, status: true, transactionId: true, diaryEntryId: true },
+  });
+  if (existing.length !== opts.attachmentIds.length) {
     throw ApiError.badRequest('One or more attachments were not found');
   }
-  for (const a of attachments) {
+  for (const a of existing) {
     if (a.projectId !== opts.projectId) throw ApiError.badRequest('Attachment belongs to another project');
     if (a.status !== 'ready') throw ApiError.badRequest('Attachment has not been finalized');
     if (a.transactionId || a.diaryEntryId) throw ApiError.badRequest('Attachment is already attached');
   }
 
-  await tx.attachment.updateMany({
-    where: { id: { in: opts.attachmentIds } },
+  const result = await tx.attachment.updateMany({
+    where: {
+      id: { in: opts.attachmentIds },
+      projectId: opts.projectId,
+      status: 'ready',
+      transactionId: null,
+      diaryEntryId: null,
+    },
     data: { [field]: opts.parentId },
   });
+  if (result.count !== opts.attachmentIds.length) {
+    throw ApiError.badRequest('One or more attachments were claimed by another request', 'ATTACHMENT_CONFLICT');
+  }
 }

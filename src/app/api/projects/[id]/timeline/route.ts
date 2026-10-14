@@ -1,4 +1,4 @@
-import { getPagination, handle, json } from '@/lib/api';
+import { getPagination, handle, json, parseOptionalDate } from '@/lib/api';
 import { requireUser } from '@/lib/auth';
 import { prisma } from '@/lib/prisma';
 import { requireRole } from '@/lib/requireRole';
@@ -13,10 +13,10 @@ export const GET = handle<Ctx>(async (req, { params: paramsPromise }) => {
 
   const url = new URL(req.url);
   const { page, limit } = getPagination(url, 25, 100);
-  const from = url.searchParams.get('from');
-  const to = url.searchParams.get('to');
+  const from = parseOptionalDate(url.searchParams.get('from'));
+  const to = parseOptionalDate(url.searchParams.get('to'));
 
-  const occurredAt = { ...(from ? { gte: new Date(from) } : {}), ...(to ? { lte: new Date(to) } : {}) };
+  const occurredAt = { ...(from ? { gte: from } : {}), ...(to ? { lte: to } : {}) };
   const hasRange = Boolean(from || to);
 
   const [txs, diaries] = await Promise.all([

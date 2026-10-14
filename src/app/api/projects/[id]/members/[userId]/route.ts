@@ -19,9 +19,7 @@ async function assertNotLastAdmin(
   });
   if (target?.role !== 'admin') return;
 
-  const adminCount = await tx.projectMember.count({
-    where: { projectId, role: 'admin' },
-  });
+  const adminCount = await tx.projectMember.count({ where: { projectId, role: 'admin' } });
   if (adminCount <= 1) {
     throw ApiError.conflict('Cannot remove or demote the last admin of the project');
   }
@@ -33,34 +31,36 @@ export const PATCH = handle<Ctx>(async (req, { params: paramsPromise }) => {
   await requireRole(params.id, actor.id, 'admin');
   const body = await parseJson(req, updateMemberRoleSchema);
 
-  const before = await prisma.projectMember.findUnique({
-    where: { projectId_userId: { projectId: params.id, userId: params.userId } },
-  });
-  if (!before) throw ApiError.notFound('Member not found');
+  // Serializable so two concurrent demotions cannot both observe two admins and leave zero.
+  const member = await prisma.$transaction(
+    async (tx) => {
+      const before = await tx.projectMember.findUnique({
+        where: { projectId_userId: { projectId: params.id, userId: params.userId } },
+        select: { role: true },
+      });
+      if (!before) throw ApiError.notFound('Member not found');
 
-  if (before.role === 'admin' && body.role !== 'admin') {
-    await prisma.$transaction((tx) => assertNotLastAdmin(tx, params.id, params.userId));
-  }
+      if (before.role === 'admin' && body.role !== 'admin') {
+        await assertNotLastAdmin(tx, params.id, params.userId);
+      }
 
-  const member = await prisma.$transaction(async (tx) => {
-    const updated = await tx.projectMember.update({
-      where: { projectId_userId: { projectId: params.id, userId: params.userId } },
-      data: { role: body.role },
-      select: {
-        role: true,
-        user: { select: { id: true, name: true, email: true } },
-      },
-    });
-    await writeAudit(tx, {
-      entity: 'member',
-      entityId: params.userId,
-      action: 'role_change',
-      actorId: actor.id,
-      before: { role: before.role },
-      after: { role: body.role },
-    });
-    return updated;
-  });
+      const updated = await tx.projectMember.update({
+        where: { projectId_userId: { projectId: params.id, userId: params.userId } },
+        data: { role: body.role },
+        select: { role: true, user: { select: { id: true, name: true, email: true } } },
+      });
+      await writeAudit(tx, {
+        entity: 'member',
+        entityId: params.userId,
+        action: 'role_change',
+        actorId: actor.id,
+        before: { role: before.role },
+        after: { role: body.role },
+      });
+      return updated;
+    },
+    { isolationLevel: Prisma.TransactionIsolationLevel.Serializable },
+  );
 
   return json({ member });
 });
@@ -70,24 +70,27 @@ export const DELETE = handle<Ctx>(async (_req, { params: paramsPromise }) => {
   const actor = await requireUser();
   await requireRole(params.id, actor.id, 'admin');
 
-  const before = await prisma.projectMember.findUnique({
-    where: { projectId_userId: { projectId: params.id, userId: params.userId } },
-  });
-  if (!before) throw ApiError.notFound('Member not found');
+  await prisma.$transaction(
+    async (tx) => {
+      const before = await tx.projectMember.findUnique({
+        where: { projectId_userId: { projectId: params.id, userId: params.userId } },
+      });
+      if (!before) throw ApiError.notFound('Member not found');
 
-  await prisma.$transaction(async (tx) => {
-    await assertNotLastAdmin(tx, params.id, params.userId);
-    await tx.projectMember.delete({
-      where: { projectId_userId: { projectId: params.id, userId: params.userId } },
-    });
-    await writeAudit(tx, {
-      entity: 'member',
-      entityId: params.userId,
-      action: 'delete',
-      actorId: actor.id,
-      before: { projectId: params.id, userId: params.userId, role: before.role },
-    });
-  });
+      await assertNotLastAdmin(tx, params.id, params.userId);
+      await tx.projectMember.delete({
+        where: { projectId_userId: { projectId: params.id, userId: params.userId } },
+      });
+      await writeAudit(tx, {
+        entity: 'member',
+        entityId: params.userId,
+        action: 'delete',
+        actorId: actor.id,
+        before: { projectId: params.id, userId: params.userId, role: before.role },
+      });
+    },
+    { isolationLevel: Prisma.TransactionIsolationLevel.Serializable },
+  );
 
   return json({ ok: true });
 });

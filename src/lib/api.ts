@@ -1,4 +1,5 @@
 import { NextResponse } from 'next/server';
+import { Prisma } from '@prisma/client';
 import { ZodError, type ZodSchema } from 'zod';
 
 export type ApiErrorBody = { error: string; code: string };
@@ -39,6 +40,20 @@ export function errorResponse(err: unknown): NextResponse<ApiErrorBody> {
   if (err instanceof ApiError) {
     return NextResponse.json({ error: err.message, code: err.code }, { status: err.status });
   }
+  if (err instanceof Prisma.PrismaClientKnownRequestError) {
+    if (err.code === 'P2002') {
+      return NextResponse.json({ error: 'Resource already exists', code: 'CONFLICT' }, { status: 409 });
+    }
+    if (err.code === 'P2025') {
+      return NextResponse.json({ error: 'Not found', code: 'NOT_FOUND' }, { status: 404 });
+    }
+    if (err.code === 'P2034') {
+      return NextResponse.json(
+        { error: 'Conflicting write, please retry', code: 'WRITE_CONFLICT' },
+        { status: 409 },
+      );
+    }
+  }
   if (err instanceof ZodError) {
     const first = err.errors[0];
     const path = first?.path.join('.');
@@ -47,6 +62,16 @@ export function errorResponse(err: unknown): NextResponse<ApiErrorBody> {
   }
   console.error('[api] unhandled error:', err);
   return NextResponse.json({ error: 'Internal server error', code: 'INTERNAL_ERROR' }, { status: 500 });
+}
+
+/** Parses an optional ISO date query param; throws 422 on invalid input. */
+export function parseOptionalDate(raw: string | null): Date | undefined {
+  if (!raw) return undefined;
+  const d = new Date(raw);
+  if (Number.isNaN(d.getTime())) {
+    throw new ApiError(422, 'VALIDATION_ERROR', `Invalid date: ${raw}`);
+  }
+  return d;
 }
 
 type Handler<Ctx> = (req: Request, ctx: Ctx) => Promise<NextResponse> | NextResponse;

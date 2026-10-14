@@ -7,12 +7,14 @@ import { headObjectSize, isR2Configured } from '@/lib/r2';
 import { serializeAttachment } from '@/lib/serialize';
 import { sizeLimitFor } from '@/lib/files';
 import { finalizeAttachmentSchema } from '@/lib/validation/schemas';
+import type { Attachment } from '@prisma/client';
 
 type Ctx = { params: Promise<{ attachmentId: string }> };
 
 /**
- * Marks an uploaded object as ready after verifying it exists in R2.
- * Optionally links it to an existing transaction or diary entry.
+ * Marks a pending upload ready after verifying it exists in R2, and optionally links it to a parent.
+ * Idempotent: finalizing an already-ready attachment returns its current state; it never relinks an
+ * attachment that already has a different parent.
  */
 export const POST = handle<Ctx>(async (req, { params: paramsPromise }) => {
   const { attachmentId } = await paramsPromise;
@@ -25,36 +27,24 @@ export const POST = handle<Ctx>(async (req, { params: paramsPromise }) => {
   if (access.role !== 'admin' && attachment.uploadedBy !== user.id) {
     throw ApiError.forbidden('You can only finalize your own uploads');
   }
-  if (attachment.status === 'ready' && !attachment.transactionId && !attachment.diaryEntryId) {
-    // idempotent: already finalized and unlinked
-  }
 
   const body = await parseJson(req, finalizeAttachmentSchema);
+  await assertParent(attachment.projectId, body.transactionId, body.diaryEntryId);
 
-  if (body.transactionId) {
-    const parent = await prisma.transaction.findUnique({ where: { id: body.transactionId } });
-    if (!parent || parent.projectId !== attachment.projectId) {
-      throw ApiError.badRequest('Transaction does not belong to this project');
-    }
-  }
-  if (body.diaryEntryId) {
-    const parent = await prisma.diaryEntry.findUnique({ where: { id: body.diaryEntryId } });
-    if (!parent || parent.projectId !== attachment.projectId) {
-      throw ApiError.badRequest('Diary entry does not belong to this project');
-    }
+  // Already finalized: no-op, or link if it is still unlinked.
+  if (attachment.status === 'ready') {
+    return json({ attachment: await linkIfNeeded(attachment, body, user.id) });
   }
 
   if (!isR2Configured()) {
-    throw new ApiError(503, 'STORAGE_UNAVAILABLE', 'Image storage is not configured');
+    throw new ApiError(503, 'STORAGE_UNAVAILABLE', 'File storage is not configured');
   }
   const size = await headObjectSize(attachment.fileKey);
   if (size === null) {
     throw new ApiError(400, 'UPLOAD_NOT_FOUND', 'Uploaded object was not found in storage');
   }
-
   const limit = sizeLimitFor(attachment.mimeType);
   if (size > limit) {
-    // Oversize: queue the object for deletion and reject.
     await prisma.objectDeletion.create({
       data: { projectId: attachment.projectId, fileKey: attachment.fileKey, lastError: 'oversize upload' },
     });
@@ -62,8 +52,8 @@ export const POST = handle<Ctx>(async (req, { params: paramsPromise }) => {
   }
 
   const updated = await prisma.$transaction(async (tx) => {
-    const saved = await tx.attachment.update({
-      where: { id: attachment.id },
+    const res = await tx.attachment.updateMany({
+      where: { id: attachment.id, status: 'pending' },
       data: {
         status: 'ready',
         size,
@@ -71,15 +61,78 @@ export const POST = handle<Ctx>(async (req, { params: paramsPromise }) => {
         ...(body.diaryEntryId ? { diaryEntryId: body.diaryEntryId } : {}),
       },
     });
+    if (res.count === 0) {
+      // Lost a race; return the now-ready row.
+      return tx.attachment.findUniqueOrThrow({ where: { id: attachment.id } });
+    }
     await writeAudit(tx, {
       entity: 'attachment',
-      entityId: saved.id,
+      entityId: attachment.id,
       action: 'finalize',
       actorId: user.id,
-      after: { status: 'ready', size, transactionId: saved.transactionId, diaryEntryId: saved.diaryEntryId },
+      after: { status: 'ready', size, transactionId: body.transactionId, diaryEntryId: body.diaryEntryId },
     });
-    return saved;
+    return tx.attachment.findUniqueOrThrow({ where: { id: attachment.id } });
   });
 
   return json({ attachment: await serializeAttachment(updated) });
 });
+
+async function assertParent(projectId: string, transactionId?: string, diaryEntryId?: string) {
+  if (transactionId) {
+    const parent = await prisma.transaction.findUnique({ where: { id: transactionId } });
+    if (!parent || parent.projectId !== projectId) {
+      throw ApiError.badRequest('Transaction does not belong to this project');
+    }
+    if (parent.deletedAt) throw ApiError.badRequest('Transaction is deleted', 'TRANSACTION_DELETED');
+  }
+  if (diaryEntryId) {
+    const parent = await prisma.diaryEntry.findUnique({ where: { id: diaryEntryId } });
+    if (!parent || parent.projectId !== projectId) {
+      throw ApiError.badRequest('Diary entry does not belong to this project');
+    }
+  }
+}
+
+async function linkIfNeeded(
+  attachment: Attachment,
+  body: { transactionId?: string; diaryEntryId?: string },
+  actorId: string,
+) {
+  const desiredParent = body.transactionId ?? body.diaryEntryId ?? null;
+  const currentParent = attachment.transactionId ?? attachment.diaryEntryId ?? null;
+
+  if (!desiredParent || currentParent === desiredParent) {
+    return serializeAttachment(attachment);
+  }
+  if (currentParent) {
+    throw ApiError.conflict('Attachment is already linked to another record');
+  }
+
+  const result = await prisma.attachment.updateMany({
+    where: {
+      id: attachment.id,
+      status: 'ready',
+      transactionId: null,
+      diaryEntryId: null,
+    },
+    data: {
+      ...(body.transactionId ? { transactionId: body.transactionId } : {}),
+      ...(body.diaryEntryId ? { diaryEntryId: body.diaryEntryId } : {}),
+    },
+  });
+  if (result.count === 0) {
+    throw ApiError.conflict('Attachment is already linked to another record');
+  }
+  const fresh = await prisma.attachment.findUniqueOrThrow({ where: { id: attachment.id } });
+  await prisma.auditLog.create({
+    data: {
+      entity: 'attachment',
+      entityId: attachment.id,
+      action: 'finalize',
+      actorId,
+      after: { linked: true, transactionId: body.transactionId, diaryEntryId: body.diaryEntryId },
+    },
+  });
+  return serializeAttachment(fresh);
+}

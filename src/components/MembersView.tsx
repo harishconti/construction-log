@@ -5,7 +5,7 @@ import { api } from '@/lib/api-client';
 
 type Role = 'admin' | 'editor' | 'viewer';
 type Member = { role: Role; createdAt: string; user: { id: string; name: string; email: string } };
-type Invitation = { id: string; email: string; role: Role; createdAt: string };
+type Invitation = { id: string; email: string; role: Role; expiresAt: string };
 
 const ROLES: Role[] = ['admin', 'editor', 'viewer'];
 
@@ -179,7 +179,9 @@ export function MembersView({ projectId, currentUserId }: { projectId: string; c
                   <li key={inv.id} className="flex flex-wrap items-center justify-between gap-2 p-3 text-sm">
                     <div>
                       <div className="font-medium">{inv.email}</div>
-                      <div className="text-xs text-slate-400">awaiting sign-up</div>
+                      <div className="text-xs text-slate-400">
+                        awaiting sign-up · expires {new Date(inv.expiresAt).toLocaleDateString()}
+                      </div>
                     </div>
                     <div className="flex items-center gap-3">
                       <span className="rounded-full bg-slate-100 px-2 py-0.5 text-xs uppercase tracking-wide text-slate-600">

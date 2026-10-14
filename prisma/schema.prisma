@@ -75,6 +75,7 @@ model Invitation {
   email     String
   role      String // 'admin' | 'editor' | 'viewer'
   invitedBy String
+  expiresAt DateTime
   createdAt DateTime @default(now())
 
   project Project @relation(fields: [projectId], references: [id], onDelete: Cascade)

@@ -2,6 +2,7 @@
 
 import { useCallback, useEffect, useState } from 'react';
 import { api } from '@/lib/api-client';
+import { todayIST } from '@/lib/period';
 import { AttachmentList, type AttachmentItem } from '@/components/AttachmentList';
 
 type Entry = {
@@ -174,7 +175,7 @@ function DiaryForm({
   onDeleteAttachment?: (id: string) => void;
 }) {
   const [entryDate, setEntryDate] = useState(() =>
-    entry ? entry.entryDate.slice(0, 10) : new Date().toISOString().slice(0, 10),
+    entry ? entry.entryDate.slice(0, 10) : todayIST(),
   );
   const [title, setTitle] = useState(entry?.title ?? '');
   const [body, setBody] = useState(entry?.body ?? '');

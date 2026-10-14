@@ -39,6 +39,16 @@ export function normalizePeriodStart(g: Granularity, d: Date): Date {
   return g === 'week' ? startOfWeekIST(d) : startOfMonthIST(d);
 }
 
+function pad2(n: number): string {
+  return String(n).padStart(2, '0');
+}
+
+/** Today's calendar date in Asia/Kolkata as `YYYY-MM-DD` (for `<input type="date">` defaults/max). */
+export function todayIST(d: Date = new Date()): string {
+  const t = new Date(d.getTime() + IST_OFFSET_MS);
+  return `${t.getUTCFullYear()}-${pad2(t.getUTCMonth() + 1)}-${pad2(t.getUTCDate())}`;
+}
+
 export function isPeriodStartAligned(g: Granularity, d: Date): boolean {
   return normalizePeriodStart(g, d).getTime() === d.getTime();
 }

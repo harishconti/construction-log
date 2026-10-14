@@ -1,12 +1,9 @@
 import { PrismaClient } from '@prisma/client';
+import { startOfMonthIST } from '../src/lib/period';
 
 const prisma = new PrismaClient();
 
 const DAY = 24 * 60 * 60 * 1000;
-
-function startOfMonth(d: Date): Date {
-  return new Date(Date.UTC(d.getUTCFullYear(), d.getUTCMonth(), 1));
-}
 
 /**
  * Seed sample project data for a Neon Auth user.
@@ -66,7 +63,7 @@ async function main() {
     include: { categories: true },
   });
 
-  const periodStart = startOfMonth(new Date());
+  const periodStart = startOfMonthIST(new Date());
   const budgetPlan: Record<string, number> = {
     Cement: 50000,
     Steel: 80000,

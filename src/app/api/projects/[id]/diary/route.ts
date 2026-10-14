@@ -55,34 +55,33 @@ export const POST = handle<Ctx>(async (req, { params: paramsPromise }) => {
 
   const { data: entry } = await withIdempotency(
     { projectId: params.id, userId: user.id, key: req.headers.get('idempotency-key'), body },
-    async () =>
-      prisma.$transaction(async (tx) => {
-        const created = await tx.diaryEntry.create({
-          data: {
-            projectId: params.id,
-            entryDate: body.entryDate,
-            title: body.title,
-            body: body.body,
-            createdBy: user.id,
-          },
+    async (tx) => {
+      const created = await tx.diaryEntry.create({
+        data: {
+          projectId: params.id,
+          entryDate: body.entryDate,
+          title: body.title,
+          body: body.body,
+          createdBy: user.id,
+        },
+      });
+      if (body.attachmentIds?.length) {
+        await linkAttachments(tx, {
+          projectId: params.id,
+          parent: 'diary',
+          parentId: created.id,
+          attachmentIds: body.attachmentIds,
         });
-        if (body.attachmentIds?.length) {
-          await linkAttachments(tx, {
-            projectId: params.id,
-            parent: 'diary',
-            parentId: created.id,
-            attachmentIds: body.attachmentIds,
-          });
-        }
-        await writeAudit(tx, {
-          entity: 'diary_entry',
-          entityId: created.id,
-          action: 'create',
-          actorId: user.id,
-          after: created,
-        });
-        return created;
-      }),
+      }
+      await writeAudit(tx, {
+        entity: 'diary_entry',
+        entityId: created.id,
+        action: 'create',
+        actorId: user.id,
+        after: created,
+      });
+      return created;
+    },
   );
 
   return json({ entry }, 201);

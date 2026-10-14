@@ -60,6 +60,20 @@ export const DELETE = handle<Ctx>(async (_req, { params: paramsPromise }) => {
   if (!before || before.projectId !== projectId) throw ApiError.notFound('Diary entry not found');
 
   await prisma.$transaction(async (tx) => {
+    // Queue the entry's R2 objects for deletion before the cascade removes the rows.
+    const attachments = await tx.attachment.findMany({
+      where: { diaryEntryId: entryId },
+      select: { fileKey: true },
+    });
+    if (attachments.length) {
+      await tx.objectDeletion.createMany({
+        data: attachments.map((a) => ({
+          projectId,
+          fileKey: a.fileKey,
+          lastError: 'diary entry deleted',
+        })),
+      });
+    }
     await tx.diaryEntry.delete({ where: { id: entryId } }); // attachments cascade
     await writeAudit(tx, {
       entity: 'diary_entry',

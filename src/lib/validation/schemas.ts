@@ -10,6 +10,12 @@ export const parentTypeSchema = z.enum(['transaction', 'diary_entry']);
 
 const FUTURE_TOLERANCE_MS = 60_000;
 
+// Money guardrails: fits Decimal(12,2) and at most two decimal places.
+const MAX_MONEY = 9_999_999_999.99;
+const twoDecimals = (v: number) => Math.abs(v * 100 - Math.round(v * 100)) < 1e-6;
+const moneyPositive = z.number().gt(0).max(MAX_MONEY).refine(twoDecimals, 'At most 2 decimal places');
+const moneyNonNegative = z.number().min(0).max(MAX_MONEY).refine(twoDecimals, 'At most 2 decimal places');
+
 // ---------------------------------------------------------------------------
 // Auth
 // ---------------------------------------------------------------------------
@@ -76,8 +82,8 @@ export const createTransactionSchema = z
   .object({
     categoryId: z.string().min(1),
     occurredAt: z.coerce.date(),
-    amount: z.number().positive(),
-    gstAmount: z.number().min(0).default(0),
+    amount: moneyPositive,
+    gstAmount: moneyNonNegative.default(0),
     vendor: z.string().trim().max(200).optional().nullable(),
     paymentMode: paymentModeSchema,
     description: z.string().trim().max(2000).optional().nullable(),
@@ -104,8 +110,8 @@ export const updateTransactionSchema = z
   .object({
     categoryId: z.string().min(1).optional(),
     occurredAt: z.coerce.date().optional(),
-    amount: z.number().positive().optional(),
-    gstAmount: z.number().min(0).optional(),
+    amount: moneyPositive.optional(),
+    gstAmount: moneyNonNegative.optional(),
     vendor: z.string().trim().max(200).optional().nullable(),
     paymentMode: paymentModeSchema.optional(),
     description: z.string().trim().max(2000).optional().nullable(),
@@ -154,12 +160,12 @@ export const createBudgetSchema = z.object({
   categoryId: z.string().min(1),
   periodType: z.enum(['week', 'month']),
   periodStart: z.coerce.date(),
-  plannedAmount: z.number().min(0),
+  plannedAmount: moneyNonNegative,
   note: z.string().trim().max(500).optional().nullable(),
 });
 
 export const updateBudgetSchema = z.object({
-  plannedAmount: z.number().min(0),
+  plannedAmount: moneyNonNegative,
   reason: z.string().trim().max(500).optional().nullable(),
   version: z.number().int().min(0).optional(),
 });

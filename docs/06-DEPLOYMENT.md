@@ -106,8 +106,9 @@ Cleanest is to reconnect Neon without a prefix. Otherwise, in Vercel → Environ
 - Long jobs (DB exports, orphan cleanup) run outside request handlers via a scheduler.
 
 ## 7. Scheduled maintenance
-- **Cleanup job**: `GET /api/maintenance/cleanup` reaps `pending` uploads older than 24h and retries
-  deferred R2 object deletions. It is wired as a **daily Vercel Cron** in `vercel.json`
+- **Cleanup job**: `GET /api/maintenance/cleanup` reaps stale uploads (never-finalized `pending`, and
+  finalized-but-unlinked `ready`, older than 24h) and retries deferred R2 object deletions. It is wired
+  as a **daily Vercel Cron** in `vercel.json`
   (`0 3 * * *`). It authenticates with a shared secret: set `MAINTENANCE_SECRET`, or rely on Vercel
   Cron's `CRON_SECRET` (Vercel sends `Authorization: Bearer $CRON_SECRET`). With neither set, the
   endpoint denies (401). If the Hobby cron/runtime limits don't fit, call it from an external scheduler.

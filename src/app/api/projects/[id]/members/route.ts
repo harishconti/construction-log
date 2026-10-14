@@ -3,6 +3,7 @@ import { requireUser } from '@/lib/auth';
 import { prisma } from '@/lib/prisma';
 import { requireRole } from '@/lib/requireRole';
 import { writeAudit } from '@/lib/audit';
+import { invitationExpiry } from '@/lib/invitations';
 import { addMemberSchema } from '@/lib/validation/schemas';
 
 type Ctx = { params: Promise<{ id: string }> };
@@ -25,7 +26,7 @@ export const GET = handle<Ctx>(async (_req, { params: paramsPromise }) => {
     prisma.invitation.findMany({
       where: { projectId: params.id },
       orderBy: { createdAt: 'asc' },
-      select: { id: true, email: true, role: true, createdAt: true },
+      select: { id: true, email: true, role: true, expiresAt: true, createdAt: true },
     }),
   ]);
 
@@ -45,9 +46,15 @@ export const POST = handle<Ctx>(async (req, { params: paramsPromise }) => {
     const invitation = await prisma.$transaction(async (tx) => {
       const saved = await tx.invitation.upsert({
         where: { projectId_email: { projectId: params.id, email: body.email } },
-        update: { role: body.role },
-        create: { projectId: params.id, email: body.email, role: body.role, invitedBy: actor.id },
-        select: { id: true, email: true, role: true, createdAt: true },
+        update: { role: body.role, expiresAt: invitationExpiry() },
+        create: {
+          projectId: params.id,
+          email: body.email,
+          role: body.role,
+          invitedBy: actor.id,
+          expiresAt: invitationExpiry(),
+        },
+        select: { id: true, email: true, role: true, expiresAt: true, createdAt: true },
       });
       await writeAudit(tx, {
         entity: 'member',
