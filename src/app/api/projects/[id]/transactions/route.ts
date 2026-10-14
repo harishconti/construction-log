@@ -5,6 +5,7 @@ import { prisma } from '@/lib/prisma';
 import { requireRole } from '@/lib/requireRole';
 import { writeAudit } from '@/lib/audit';
 import { withIdempotency } from '@/lib/idempotency';
+import { linkAttachments } from '@/lib/attachments';
 import { serializeAttachments } from '@/lib/serialize';
 import {
   createTransactionSchema,
@@ -132,7 +133,12 @@ export const POST = handle<Ctx>(async (req, { params: paramsPromise }) => {
         });
 
         if (body.attachmentIds?.length) {
-          await linkAttachments(tx, params.id, created.id, body.attachmentIds);
+          await linkAttachments(tx, {
+            projectId: params.id,
+            parent: 'transaction',
+            parentId: created.id,
+            attachmentIds: body.attachmentIds,
+          });
         }
 
         await writeAudit(tx, {
@@ -149,24 +155,3 @@ export const POST = handle<Ctx>(async (req, { params: paramsPromise }) => {
 
   return json({ transaction }, 201);
 });
-
-async function linkAttachments(
-  tx: Prisma.TransactionClient,
-  projectId: string,
-  transactionId: string,
-  attachmentIds: string[],
-): Promise<void> {
-  const attachments = await tx.attachment.findMany({ where: { id: { in: attachmentIds } } });
-  if (attachments.length !== attachmentIds.length) {
-    throw ApiError.badRequest('One or more attachments were not found');
-  }
-  for (const a of attachments) {
-    if (a.projectId !== projectId) throw ApiError.badRequest('Attachment belongs to another project');
-    if (a.status !== 'ready') throw ApiError.badRequest('Attachment has not been finalized');
-    if (a.transactionId || a.diaryEntryId) throw ApiError.badRequest('Attachment is already attached');
-  }
-  await tx.attachment.updateMany({
-    where: { id: { in: attachmentIds } },
-    data: { transactionId },
-  });
-}

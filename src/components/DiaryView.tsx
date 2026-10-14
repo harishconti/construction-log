@@ -1,0 +1,194 @@
+'use client';
+
+import { useCallback, useEffect, useState } from 'react';
+import { api } from '@/lib/api-client';
+
+type Attachment = { id: string; url: string; mimeType: string };
+type Entry = {
+  id: string;
+  entryDate: string;
+  title: string;
+  body: string;
+  attachments: Attachment[];
+};
+
+export function DiaryView({ projectId }: { projectId: string }) {
+  const [items, setItems] = useState<Entry[]>([]);
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState<string | null>(null);
+  const [showForm, setShowForm] = useState(false);
+
+  const load = useCallback(async () => {
+    setLoading(true);
+    setError(null);
+    try {
+      const res = await api.get<{ items: Entry[] }>(`/api/projects/${projectId}/diary`);
+      setItems(res.items);
+    } catch (err) {
+      setError(err instanceof Error ? err.message : 'Failed to load');
+    } finally {
+      setLoading(false);
+    }
+  }, [projectId]);
+
+  useEffect(() => {
+    // eslint-disable-next-line react-hooks/set-state-in-effect
+    void load();
+  }, [load]);
+
+  return (
+    <div className="space-y-4">
+      <div className="flex items-center justify-between">
+        <h1 className="text-lg font-semibold">Site diary</h1>
+        <button
+          type="button"
+          onClick={() => setShowForm((v) => !v)}
+          className="rounded-lg bg-primary px-3 py-1.5 text-sm font-medium text-white"
+        >
+          {showForm ? 'Close' : 'Add entry'}
+        </button>
+      </div>
+
+      {showForm && (
+        <DiaryForm
+          projectId={projectId}
+          onCreated={() => {
+            setShowForm(false);
+            void load();
+          }}
+        />
+      )}
+
+      {error && <p className="text-sm text-red-600">{error}</p>}
+
+      {loading ? (
+        <p className="text-sm text-slate-500">Loading…</p>
+      ) : items.length === 0 ? (
+        <div className="rounded-xl border border-dashed border-slate-300 bg-white p-8 text-center text-sm text-slate-500">
+          No diary entries yet — log your first site observation.
+        </div>
+      ) : (
+        <ol className="space-y-3">
+          {items.map((e) => (
+            <li key={e.id} className="rounded-xl bg-white p-4 shadow-sm">
+              <div className="text-xs text-slate-500">{new Date(e.entryDate).toLocaleDateString()}</div>
+              <h2 className="mt-1 font-medium">{e.title}</h2>
+              {e.body && <p className="mt-1 whitespace-pre-wrap text-sm text-slate-600">{e.body}</p>}
+              {e.attachments.length > 0 && (
+                <div className="mt-3 flex gap-2 overflow-x-auto">
+                  {e.attachments.map((a) => (
+                    // eslint-disable-next-line @next/next/no-img-element
+                    <img
+                      key={a.id}
+                      src={a.url}
+                      alt=""
+                      className="h-24 w-24 shrink-0 rounded-lg object-cover"
+                    />
+                  ))}
+                </div>
+              )}
+            </li>
+          ))}
+        </ol>
+      )}
+    </div>
+  );
+}
+
+function DiaryForm({ projectId, onCreated }: { projectId: string; onCreated: () => void }) {
+  const [entryDate, setEntryDate] = useState(() => new Date().toISOString().slice(0, 10));
+  const [title, setTitle] = useState('');
+  const [body, setBody] = useState('');
+  const [files, setFiles] = useState<FileList | null>(null);
+  const [pending, setPending] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+
+  async function uploadPhoto(f: File): Promise<string> {
+    const presign = await api.post<{ uploadUrl: string; attachmentId: string }>('/api/uploads/presign', {
+      projectId,
+      parentType: 'diary_entry',
+      mimeType: f.type,
+      size: f.size,
+    });
+    const put = await fetch(presign.uploadUrl, { method: 'PUT', body: f, headers: { 'Content-Type': f.type } });
+    if (!put.ok) throw new Error('Photo upload failed');
+    await api.post(`/api/uploads/${presign.attachmentId}/finalize`, {});
+    return presign.attachmentId;
+  }
+
+  async function submit(e: React.FormEvent) {
+    e.preventDefault();
+    setError(null);
+    setPending(true);
+    try {
+      const attachmentIds: string[] = [];
+      if (files) {
+        for (const f of Array.from(files)) {
+          if (!f.type.startsWith('image/')) continue;
+          attachmentIds.push(await uploadPhoto(f));
+        }
+      }
+      await api.post(
+        `/api/projects/${projectId}/diary`,
+        { entryDate: new Date(entryDate).toISOString(), title, body, attachmentIds },
+        { 'Idempotency-Key': crypto.randomUUID() },
+      );
+      onCreated();
+    } catch (err) {
+      setError(err instanceof Error ? err.message : 'Failed to save');
+    } finally {
+      setPending(false);
+    }
+  }
+
+  return (
+    <form onSubmit={submit} className="space-y-3 rounded-xl bg-white p-4 shadow-sm">
+      <label className="block text-sm">
+        <span className="text-slate-700">Date</span>
+        <input
+          type="date"
+          value={entryDate}
+          onChange={(e) => setEntryDate(e.target.value)}
+          className="mt-1 w-full rounded-lg border border-slate-300 px-3 py-2"
+        />
+      </label>
+      <label className="block text-sm">
+        <span className="text-slate-700">Title</span>
+        <input
+          required
+          value={title}
+          onChange={(e) => setTitle(e.target.value)}
+          className="mt-1 w-full rounded-lg border border-slate-300 px-3 py-2"
+        />
+      </label>
+      <label className="block text-sm">
+        <span className="text-slate-700">Notes</span>
+        <textarea
+          value={body}
+          onChange={(e) => setBody(e.target.value)}
+          rows={4}
+          className="mt-1 w-full rounded-lg border border-slate-300 px-3 py-2"
+        />
+      </label>
+      <label className="block text-sm">
+        <span className="text-slate-700">Photos (up to 10)</span>
+        <input
+          type="file"
+          accept="image/*"
+          capture="environment"
+          multiple
+          onChange={(e) => setFiles(e.target.files)}
+          className="mt-1 block w-full text-sm"
+        />
+      </label>
+      {error && <p className="text-sm text-red-600">{error}</p>}
+      <button
+        type="submit"
+        disabled={pending}
+        className="rounded-lg bg-primary px-4 py-2 text-sm font-medium text-white disabled:opacity-60"
+      >
+        {pending ? 'Saving…' : 'Save entry'}
+      </button>
+    </form>
+  );
+}

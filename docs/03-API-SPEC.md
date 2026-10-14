@@ -101,9 +101,10 @@ All errors return `{ error: string, code: string }` with an appropriate HTTP sta
 (400/401/403/404/409/422/500).
 
 ## Implementation Status
-Implemented: Neon Auth proxy; projects/members/categories/transactions; two-phase R2 upload
-(presign → PUT → finalize) with link-on-create; attachment delete; editor-any transaction edits;
-soft-delete/restore; optimistic locking (`version`) and `Idempotency-Key` on transaction create.
+Implemented: Neon Auth proxy; projects/members/categories; transactions (list/create/update/delete/
+restore) with two-phase R2 upload linking, editor-any edits, optimistic locking and idempotency;
+diary (list/create/update/delete) with multi-image linking; budgets (list with derived actual +
+variance, create/upsert, revise with revision history); timeline; dashboard.
 
-Pending: diary endpoints, budgets/revisions, timeline/dashboard; scheduled orphan-cleanup; Neon Auth
-trusted-origin configuration; production `prisma migrate deploy` release process.
+Pending: scheduled orphan-`pending` cleanup and R2 deletion retries; Neon Auth trusted-origin
+configuration; production `prisma migrate deploy` release process.

@@ -128,6 +128,42 @@ export const updateTransactionSchema = z
   });
 
 // ---------------------------------------------------------------------------
+// Diary entries
+// ---------------------------------------------------------------------------
+
+export const createDiarySchema = z.object({
+  entryDate: z.coerce.date(),
+  title: z.string().trim().min(1).max(200),
+  body: z.string().trim().max(20000),
+  attachmentIds: z.array(z.string().min(1)).max(10).optional(),
+});
+
+export const updateDiarySchema = z.object({
+  entryDate: z.coerce.date().optional(),
+  title: z.string().trim().min(1).max(200).optional(),
+  body: z.string().trim().max(20000).optional(),
+  version: z.number().int().min(0).optional(),
+});
+
+// ---------------------------------------------------------------------------
+// Budgets
+// ---------------------------------------------------------------------------
+
+export const createBudgetSchema = z.object({
+  categoryId: z.string().min(1),
+  periodType: z.enum(['week', 'month']),
+  periodStart: z.coerce.date(),
+  plannedAmount: z.number().min(0),
+  note: z.string().trim().max(500).optional().nullable(),
+});
+
+export const updateBudgetSchema = z.object({
+  plannedAmount: z.number().min(0),
+  reason: z.string().trim().max(500).optional().nullable(),
+  version: z.number().int().min(0).optional(),
+});
+
+// ---------------------------------------------------------------------------
 // Uploads
 // ---------------------------------------------------------------------------
 
@@ -157,5 +193,9 @@ export type CreateCategoryInput = z.infer<typeof createCategorySchema>;
 export type UpdateCategoryInput = z.infer<typeof updateCategorySchema>;
 export type CreateTransactionInput = z.infer<typeof createTransactionSchema>;
 export type UpdateTransactionInput = z.infer<typeof updateTransactionSchema>;
+export type CreateDiaryInput = z.infer<typeof createDiarySchema>;
+export type UpdateDiaryInput = z.infer<typeof updateDiarySchema>;
+export type CreateBudgetInput = z.infer<typeof createBudgetSchema>;
+export type UpdateBudgetInput = z.infer<typeof updateBudgetSchema>;
 export type PresignInput = z.infer<typeof presignSchema>;
 export type FinalizeAttachmentInput = z.infer<typeof finalizeAttachmentSchema>;
