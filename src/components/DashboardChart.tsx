@@ -16,9 +16,9 @@ export function DashboardChart({ data }: { data: ChartDatum[] }) {
       <ResponsiveContainer width="100%" height="100%">
         <BarChart data={data} layout="vertical" margin={{ top: 4, right: 8, bottom: 4, left: 8 }} barGap={2}>
           <CartesianGrid strokeDasharray="3 3" horizontal={false} />
-          <XAxis type="number" tick={{ fontSize: 12 }} tickFormatter={(v: number) => formatINR(v, { compact: true })} />
+          <XAxis type="number" tick={{ fontSize: 12 }} tickFormatter={(value) => formatINR(Number(value), { compact: true })} />
           <YAxis type="category" dataKey="name" width={92} tick={{ fontSize: 12 }} />
-          <Tooltip formatter={(v: number) => formatINR(v)} />
+          <Tooltip formatter={(value) => formatINR(Number(value))} />
           <Legend />
           <Bar dataKey="planned" name="Planned" fill="var(--primary-tint)" stroke="var(--primary)" radius={[0, 4, 4, 0]} />
           <Bar dataKey="actual" name="Actual" fill="var(--primary)" radius={[0, 4, 4, 0]} />

@@ -120,8 +120,11 @@ Projects (status pills, "New project" sheet) are migrated onto the primitives; t
 grouped list with icons and sign-out. PWA now ships 192/512 + maskable PNG icons and an
 `apple-touch-icon`. `window.confirm`/`prompt` are gone from `src/`.
 
-**Batch A3 (rest) — pending:** rate limiting; magic-byte sniffing; dependency upgrades (React 19 /
-Prisma 6 / vitest); enum/CHECK constraints.
+**Batch A3 — complete.** Rate limiting (fixed-window, Postgres-backed) on presign / transaction &
+diary creates / invites; DB `CHECK` constraints for enum-like columns; magic-byte content sniffing at
+finalize; and dependency upgrades — **React 19**, **Recharts 3**, **Vitest 5** (clears the dev-only
+advisories). React 18 deprecation is resolved. Prisma remains 5.x (driver-adapter/Neon-serverless is a
+future consideration).
 
 ## Not yet implemented (backlog)
 1. **Magic link**: UI is wired (`signIn.magicLink`), but the branch reports `magicLink.enabled: false`
