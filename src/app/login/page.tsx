@@ -2,6 +2,8 @@
 
 import { useState } from 'react';
 import { useRouter } from 'next/navigation';
+import { Mail } from 'lucide-react';
+import { GoogleIcon } from '@/components/icons/GoogleIcon';
 import { authClient } from '@/lib/auth/client';
 import { Button } from '@/components/ui/Button';
 import { Alert } from '@/components/ui/Alert';
@@ -110,6 +112,7 @@ export default function LoginPage() {
 
         <div className="mt-4">
           <Button variant="secondary" className="w-full" loading={socialPending} onClick={signInWithGoogle}>
+            {!socialPending && <GoogleIcon />}
             {mode === 'sign-up' ? 'Sign up with Google' : 'Sign in with Google'}
           </Button>
         </div>
@@ -165,8 +168,9 @@ export default function LoginPage() {
             type="button"
             onClick={sendMagicLink}
             disabled={magicPending}
-            className="mt-4 w-full text-center text-sm text-primary hover:underline disabled:opacity-60"
+            className="mt-4 inline-flex min-h-11 w-full items-center justify-center gap-2 text-sm text-primary hover:underline disabled:opacity-60"
           >
+            <Mail size={16} aria-hidden />
             {magicPending ? 'Sending…' : 'Email me a sign-in link'}
           </button>
         )}

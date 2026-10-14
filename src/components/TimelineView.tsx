@@ -2,7 +2,7 @@
 
 import { useCallback, useEffect, useMemo, useState } from 'react';
 import Link from 'next/link';
-import { BookOpen, Receipt } from 'lucide-react';
+import { BookOpen, ChevronDown, Receipt, X } from 'lucide-react';
 import { api } from '@/lib/api-client';
 import { formatDayLabel, formatINR } from '@/lib/format';
 import { Alert } from '@/components/ui/Alert';
@@ -136,7 +136,7 @@ export function TimelineView({ projectId }: { projectId: string }) {
               setTo('');
             }}
           >
-            Clear dates
+            <X size={16} aria-hidden /> Clear dates
           </Button>
         )}
       </div>
@@ -199,7 +199,7 @@ export function TimelineView({ projectId }: { projectId: string }) {
       {hasMore && (
         <div className="flex justify-center">
           <Button variant="secondary" onClick={loadMore} loading={loading && items.length > 0}>
-            Load more
+            {!(loading && items.length > 0) && <ChevronDown size={16} aria-hidden />} Load more
           </Button>
         </div>
       )}

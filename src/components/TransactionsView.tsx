@@ -1,7 +1,20 @@
 'use client';
 
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
-import { FileText, Pencil, Plus, Receipt, RotateCcw, Search, SlidersHorizontal, Trash2, X } from 'lucide-react';
+import {
+  ChevronLeft,
+  ChevronRight,
+  FileText,
+  FunnelX,
+  Pencil,
+  Plus,
+  Receipt,
+  RotateCcw,
+  Search,
+  SlidersHorizontal,
+  Trash2,
+  X,
+} from 'lucide-react';
 import { api, newIdempotencyKey } from '@/lib/api-client';
 import { istDateToInstant, istDayEnd, todayIST } from '@/lib/period';
 import { formatDate, formatDayLabel, formatINR } from '@/lib/format';
@@ -358,8 +371,8 @@ export function TransactionsView({ projectId, role }: { projectId: string; role:
           {paymentMode && <FilterChip label={PAYMENT_LABEL[paymentMode] ?? paymentMode} onClear={() => { setPage(1); setPaymentMode(''); }} />}
           {from && <FilterChip label={`From ${formatDate(from)}`} onClear={() => { setPage(1); setFrom(''); }} />}
           {to && <FilterChip label={`To ${formatDate(to)}`} onClear={() => { setPage(1); setTo(''); }} />}
-          <button type="button" onClick={resetFilters} className="min-h-11 px-2 text-sm text-ink-2 hover:text-ink">
-            Clear all
+          <button type="button" onClick={resetFilters} className="inline-flex min-h-11 items-center gap-1 px-2 text-sm text-ink-2 hover:text-ink">
+            <X size={14} aria-hidden /> Clear all
           </button>
         </div>
       )}
@@ -379,7 +392,7 @@ export function TransactionsView({ projectId, role }: { projectId: string; role:
           action={
             filtered ? (
               <Button variant="secondary" onClick={resetFilters}>
-                Clear filters
+                <FunnelX size={16} aria-hidden /> Clear filters
               </Button>
             ) : canEdit ? (
               <Button onClick={() => setSheet({ open: true, entry: null })}>
@@ -516,13 +529,13 @@ export function TransactionsView({ projectId, role }: { projectId: string; role:
       {pagination && pagination.pages > 1 && (
         <div className="flex items-center justify-center gap-3 text-sm">
           <Button variant="secondary" disabled={page <= 1} onClick={() => setPage((p) => p - 1)}>
-            ‹ Prev
+            <ChevronLeft size={16} aria-hidden /> Prev
           </Button>
           <span className="num text-ink-2">
             {pagination.page} / {pagination.pages}
           </span>
           <Button variant="secondary" disabled={page >= pagination.pages} onClick={() => setPage((p) => p + 1)}>
-            Next ›
+            Next <ChevronRight size={16} aria-hidden />
           </Button>
         </div>
       )}

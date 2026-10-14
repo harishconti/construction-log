@@ -63,13 +63,13 @@ PWA: `manifest.json` + service worker (`public/sw.js`, registered in production)
 - **Maintenance**: reaps `pending` uploads older than 24h and retries deferred R2 deletions (attempt cap + TTL).
 
 ## Verification
-- `npm run typecheck`, `npm run lint`, `npm test` (**104 unit tests**: roles, validation, period/budget
+- `npm run typecheck`, `npm run lint`, `npm test` (**111 unit tests**: roles, validation, period/budget
   math, maintenance auth, file policy, audit regressions, API error mapping/pagination, API client,
   INR/IST formatting, and server guards — `requireRole`, rate limit, audit write, idempotency,
   attachment linking, user-mirror first-sign-in race — with Prisma mocked), `npm run build` — all green.
 - **Playwright e2e** (`npm run test:e2e`, runs in CI): public tier on desktop + Pixel 7 — login UI,
   axe WCAG A/AA in light and dark, auth redirects, every API route → 401, maintenance secret, health
-  shape, security headers/CSP, PWA manifest/icons, service worker (84 tests, all passing). Authed tier
+  shape, security headers/CSP, PWA manifest/icons, service worker, Google/mail icons (86 tests, all passing). Authed tier
   (`e2e/authed/`: project/expense/diary flows, version conflict, idempotency, GST rule, no sideways
   scroll on mobile, soft-delete exclusion from totals + restore, budget upsert/variance status/
   revisions, invitations, last-admin guard) is opt-in via `E2E_ALLOW_WRITES=1` and must target a non-production Neon branch.
@@ -172,8 +172,8 @@ colour); budget Revise/Set targets under 44px; long names/URLs causing sideways 
 4. **Release/backup tooling**: `npm run db:backup` / `db:restore` + `prisma:deploy` implemented (see
    `10-OPERATIONS.md`); still to do: schedule backups outside Vercel, provision a separate prod backup
    bucket/credentials, and a documented Neon Auth recovery step.
-5. **Dev/prod isolation**: local dev currently targets the default (production) Neon branch — create a
-   `dev` branch (needs Neon CLI auth; procedure in `10-OPERATIONS.md`).
+5. **Dev/prod isolation**: a Neon `dev` branch now exists (created 15 Oct 2026, with its own Neon
+   Auth) and runs the authed e2e suite. Still to do: point local `.env` at it instead of production.
 6. **Optional hardening**: malware/AV scanning on finalize; separate restricted runtime vs migration DB credentials. (Magic-byte sniffing shipped in A3.)
 
 ## Environment variables

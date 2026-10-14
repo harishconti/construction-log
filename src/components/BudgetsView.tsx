@@ -1,7 +1,7 @@
 'use client';
 
 import { useCallback, useEffect, useState } from 'react';
-import { ChevronLeft, ChevronRight } from 'lucide-react';
+import { ChevronLeft, ChevronRight, Pencil, Plus } from 'lucide-react';
 import { api } from '@/lib/api-client';
 import { formatDate, formatINR } from '@/lib/format';
 import { Button } from '@/components/ui/Button';
@@ -141,6 +141,7 @@ export function BudgetsView({ projectId, canEdit }: { projectId: string; canEdit
                 )}
                 {canEdit && (
                   <Button variant="secondary" className="mt-3 w-full" onClick={() => setRevise({ open: true, row: r })}>
+                    {r.budgetId ? <Pencil size={16} aria-hidden /> : <Plus size={16} aria-hidden />}
                     {r.budgetId ? 'Revise' : 'Set budget'}
                   </Button>
                 )}
@@ -188,8 +189,9 @@ export function BudgetsView({ projectId, canEdit }: { projectId: string; canEdit
                           type="button"
                           onClick={() => setRevise({ open: true, row: r })}
                           aria-label={`${r.budgetId ? 'Revise' : 'Set'} ${r.name} budget`}
-                          className="inline-flex min-h-11 items-center rounded-md px-2 text-primary hover:underline"
+                          className="inline-flex min-h-11 items-center gap-1.5 rounded-md px-2 text-primary hover:underline"
                         >
+                          {r.budgetId ? <Pencil size={15} aria-hidden /> : <Plus size={15} aria-hidden />}
                           {r.budgetId ? 'Revise' : 'Set'}
                         </button>
                       </td>

@@ -1,7 +1,7 @@
 'use client';
 
 import { useCallback, useEffect, useState } from 'react';
-import { Mail, Plus } from 'lucide-react';
+import { Mail, Plus, UserMinus, X } from 'lucide-react';
 import { api } from '@/lib/api-client';
 import { formatDate } from '@/lib/format';
 import { Button } from '@/components/ui/Button';
@@ -187,7 +187,7 @@ export function MembersView({ projectId, currentUserId }: { projectId: string; c
                     disabled={m.user.id === currentUserId}
                     onClick={() => requestRemove(m)}
                   >
-                    Remove
+                    <UserMinus size={16} aria-hidden /> Remove
                   </Button>
                 </div>
               </li>
@@ -210,7 +210,7 @@ export function MembersView({ projectId, currentUserId }: { projectId: string; c
                       </div>
                     </div>
                     <Button variant="ghost" className="text-danger hover:bg-danger-tint" onClick={() => requestCancel(inv)}>
-                      Cancel
+                      <X size={16} aria-hidden /> Cancel
                     </Button>
                   </li>
                 ))}

@@ -1,7 +1,7 @@
 'use client';
 
 import { useCallback, useEffect, useState } from 'react';
-import { Check, Pencil, Plus } from 'lucide-react';
+import { Archive, ArchiveRestore, Check, ChevronDown, Pencil, Plus, Save } from 'lucide-react';
 import { api } from '@/lib/api-client';
 import { Button } from '@/components/ui/Button';
 import { Alert } from '@/components/ui/Alert';
@@ -158,7 +158,7 @@ export function SettingsView({ projectId, initialProject }: { projectId: string;
           </Field>
         </div>
         <Button type="submit" loading={savingProject}>
-          Save project
+          {!savingProject && <Save size={16} aria-hidden />} Save project
         </Button>
       </form>
 
@@ -222,7 +222,7 @@ export function SettingsView({ projectId, initialProject }: { projectId: string;
                   <Pencil size={15} aria-hidden /> Rename
                 </Button>
                 <Button variant="ghost" aria-label={`Deactivate ${c.name}`} onClick={() => toggleCategory(c)}>
-                  Deactivate
+                  <Archive size={15} aria-hidden /> Deactivate
                 </Button>
               </span>
             </li>
@@ -235,8 +235,9 @@ export function SettingsView({ projectId, initialProject }: { projectId: string;
               type="button"
               onClick={() => setShowInactive((v) => !v)}
               aria-expanded={showInactive}
-              className="min-h-11 text-sm text-ink-3 hover:text-ink"
+              className="inline-flex min-h-11 items-center gap-1 text-sm text-ink-3 hover:text-ink"
             >
+              <ChevronDown size={16} aria-hidden className={`transition-transform ${showInactive ? 'rotate-180' : ''}`} />
               {showInactive ? 'Hide' : 'Show'} inactive ({inactive.length})
             </button>
             {showInactive && (
@@ -247,7 +248,7 @@ export function SettingsView({ projectId, initialProject }: { projectId: string;
                       {c.name} <span className="text-xs">({TYPE_LABEL[c.type] ?? c.type})</span>
                     </span>
                     <Button variant="ghost" aria-label={`Activate ${c.name}`} onClick={() => toggleCategory(c)}>
-                      Activate
+                      <ArchiveRestore size={15} aria-hidden /> Activate
                     </Button>
                   </li>
                 ))}
