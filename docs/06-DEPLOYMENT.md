@@ -94,6 +94,7 @@ Cleanest is to reconnect Neon without a prefix. Otherwise, in Vercel → Environ
 - Wait for Vercel "valid" + HTTPS cert, then verify `https://build.harishspace.in`.
 - Then update app URL, Neon Auth allowed origins, and production R2 CORS.
 - Preserve existing website/email records; do not enable Flexible SSL.
+- The **Cloudflare Tunnel** (`cloudflared`) from the old Oracle-VM plan is **not used** by Vercel — delete the tunnel and any `*.cfargotunnel.com` DNS record if present. DNS for `harishspace.in` is managed in Cloudflare (nameservers moved there); Hostinger is only the registrar.
 
 ## 6. Runtime constraints (serverless)
 - No local file storage, daemons, WebSocket servers, or infinite loops.
