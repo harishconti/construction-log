@@ -1,11 +1,13 @@
 'use client';
 
-import { useCallback, useEffect, useRef, useState } from 'react';
-import { Plus, Upload } from 'lucide-react';
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
+import { Pencil, Plus, Trash2 } from 'lucide-react';
 import { api, newIdempotencyKey } from '@/lib/api-client';
 import { todayIST } from '@/lib/period';
 import { formatDayLabel } from '@/lib/format';
 import { AttachmentList, type AttachmentItem } from '@/components/AttachmentList';
+import { UploadPicker, useUploads } from '@/components/UploadPicker';
+import { IconButton } from '@/components/ui/IconButton';
 import { Button } from '@/components/ui/Button';
 import { Sheet } from '@/components/ui/Sheet';
 import { ConfirmDialog } from '@/components/ui/ConfirmDialog';
@@ -45,8 +47,12 @@ export function DiaryView({
     run: () => undefined,
   });
 
+  const [highlight, setHighlight] = useState<string | null>(null);
+
   const isAdmin = role === 'admin';
   const canWrite = role === 'admin' || role === 'editor';
+  // Editors may change their own entries; admins any entry. Viewers never.
+  const canEditEntry = (e: Entry) => canWrite && (isAdmin || e.createdBy === currentUserId);
 
   const load = useCallback(async () => {
     setLoading(true);
@@ -66,12 +72,43 @@ export function DiaryView({
     void load();
   }, [load]);
 
+  const groups = useMemo(() => {
+    const out: { key: string; label: string; entries: Entry[] }[] = [];
+    for (const e of items) {
+      const key = e.entryDate.slice(0, 10);
+      let g = out.find((x) => x.key === key);
+      if (!g) {
+        g = { key, label: formatDayLabel(e.entryDate), entries: [] };
+        out.push(g);
+      }
+      g.entries.push(e);
+    }
+    return out;
+  }, [items]);
+
+  // Deep link from the dashboard: /diary#entry-<id>.
+  const linked = useRef(false);
+  useEffect(() => {
+    if (linked.current || items.length === 0) return;
+    const match = window.location.hash.match(/^#entry-(.+)$/);
+    if (!match) return;
+    linked.current = true;
+    const id = decodeURIComponent(match[1]);
+    if (!items.some((e) => e.id === id)) return;
+    // eslint-disable-next-line react-hooks/set-state-in-effect
+    setHighlight(id);
+    requestAnimationFrame(() => document.getElementById(`entry-${id}`)?.scrollIntoView({ block: 'center' }));
+    const t = setTimeout(() => setHighlight(null), 2500);
+    return () => clearTimeout(t);
+  }, [items]);
+
   function requestDelete(entry: Entry) {
     setConfirm({
       open: true,
       message: `Delete “${entry.title}”? This cannot be undone.`,
       run: async () => {
         setConfirm((c) => ({ ...c, open: false }));
+        setSheet({ open: false, entry: null });
         try {
           await api.delete(`/api/projects/${projectId}/diary/${entry.id}`);
           toast.notify('Entry deleted');
@@ -86,12 +123,15 @@ export function DiaryView({
   function requestDeleteAttachment(id: string) {
     setConfirm({
       open: true,
-      message: 'Remove this attachment?',
+      message: 'Remove this attachment? This cannot be undone.',
       run: async () => {
         setConfirm((c) => ({ ...c, open: false }));
         try {
           await api.delete(`/api/attachments/${id}`);
           toast.notify('Attachment removed');
+          setSheet((s) =>
+            s.entry ? { ...s, entry: { ...s.entry, attachments: s.entry.attachments.filter((a) => a.id !== id) } } : s,
+          );
           void load();
         } catch (err) {
           toast.notify(err instanceof Error ? err.message : 'Failed to remove', 'error');
@@ -103,59 +143,67 @@ export function DiaryView({
   return (
     <div className="space-y-4">
       <div className="flex items-center justify-between">
-        <h1 className="font-display text-2xl font-bold">Site diary</h1>
-        <Button onClick={() => setSheet({ open: true, entry: null })} className="hidden sm:inline-flex">
-          <Plus size={16} aria-hidden /> Add entry
-        </Button>
+        <h1 className="font-display text-2xl font-bold lg:text-[28px]">Site diary</h1>
+        {canWrite && (
+          <Button onClick={() => setSheet({ open: true, entry: null })} className="hidden md:inline-flex">
+            <Plus size={16} aria-hidden /> Add entry
+          </Button>
+        )}
       </div>
 
       {error && <Alert message={error} onRetry={load} />}
 
       {loading && items.length === 0 ? (
-        <SkeletonRows rows={3} />
+        <SkeletonRows rows={3} label="Loading diary" />
       ) : items.length === 0 ? (
         <EmptyState
           title="No diary entries yet — log your first site observation."
           action={
-            <Button onClick={() => setSheet({ open: true, entry: null })}>
-              <Plus size={16} aria-hidden /> Add entry
-            </Button>
+            canWrite ? (
+              <Button onClick={() => setSheet({ open: true, entry: null })}>
+                <Plus size={16} aria-hidden /> Add entry
+              </Button>
+            ) : undefined
           }
         />
       ) : (
-        <ol className="space-y-3">
-          {items.map((e) => {
-            const canEditThis = isAdmin || e.createdBy === currentUserId;
-            return (
-              <li key={e.id} className="rounded-lg border border-border bg-surface p-4">
-                <div className="flex items-start justify-between gap-2">
-                  <div className="min-w-0">
-                    <div className="text-xs text-ink-3">{formatDayLabel(e.entryDate)}</div>
-                    <h2 className="mt-1 font-medium">{e.title}</h2>
-                  </div>
-                  <div className="flex shrink-0 items-center gap-1">
-                    {canEditThis && (
-                      <Button variant="ghost" onClick={() => setSheet({ open: true, entry: e })}>
-                        Edit
-                      </Button>
-                    )}
-                    {isAdmin && (
-                      <Button variant="ghost" className="text-danger hover:bg-danger-tint" onClick={() => requestDelete(e)}>
-                        Delete
-                      </Button>
-                    )}
-                  </div>
-                </div>
-                {e.body && <p className="mt-1 whitespace-pre-wrap text-sm text-ink-2">{e.body}</p>}
-                <AttachmentList
-                  attachments={e.attachments}
-                  thumbClass="h-24 w-24"
-                  onDelete={canEditThis ? requestDeleteAttachment : undefined}
-                />
-              </li>
-            );
-          })}
-        </ol>
+        <div className="space-y-6">
+          {groups.map((g) => (
+            <section key={g.key} aria-labelledby={`day-${g.key}`}>
+              <h2 id={`day-${g.key}`} className="mb-2 flex items-center gap-2 text-sm font-semibold text-ink-2">
+                <span className="h-2.5 w-2.5 rounded-full bg-accent" aria-hidden />
+                {g.label}
+              </h2>
+              <ol className="ml-[4px] space-y-3 border-l-2 border-border pl-4">
+                {g.entries.map((e) => {
+                  const editable = canEditEntry(e);
+                  return (
+                    <li
+                      key={e.id}
+                      id={`entry-${e.id}`}
+                      className={`rounded-lg border bg-surface p-4 transition-colors ${
+                        highlight === e.id ? 'border-primary bg-primary-tint' : 'border-border'
+                      }`}
+                    >
+                      <div className="flex items-start justify-between gap-2">
+                        <h3 className="min-w-0 pt-2.5 font-medium">{e.title}</h3>
+                        {editable && (
+                          <IconButton label={`Edit ${e.title}`} onClick={() => setSheet({ open: true, entry: e })} className="-mr-2 -mt-1 shrink-0">
+                            <Pencil size={18} />
+                          </IconButton>
+                        )}
+                      </div>
+                      {e.body && <p className="mt-1 whitespace-pre-wrap text-sm text-ink-2">{e.body}</p>}
+                      <div className="md:max-w-xl">
+                        <AttachmentList attachments={e.attachments} layout="grid" />
+                      </div>
+                    </li>
+                  );
+                })}
+              </ol>
+            </section>
+          ))}
+        </div>
       )}
 
       {canWrite && (
@@ -163,7 +211,7 @@ export function DiaryView({
           type="button"
           aria-label="Add diary entry"
           onClick={() => setSheet({ open: true, entry: null })}
-          className="fixed right-4 z-40 flex h-14 w-14 items-center justify-center rounded-full bg-primary text-primary-foreground shadow-e2 sm:hidden"
+          className="fixed right-4 z-40 flex h-14 w-14 items-center justify-center rounded-full bg-primary text-primary-foreground shadow-e2 md:hidden"
           style={{ bottom: 'calc(var(--bottom-nav-h) + 16px)' }}
         >
           <Plus size={26} aria-hidden />
@@ -174,6 +222,9 @@ export function DiaryView({
         <DiarySheet
           projectId={projectId}
           entry={sheet.entry}
+          canDelete={isAdmin}
+          onDelete={requestDelete}
+          onMessage={(m) => toast.notify(m, 'info')}
           onClose={() => setSheet({ open: false, entry: null })}
           onSaved={(msg) => {
             toast.notify(msg);
@@ -200,12 +251,18 @@ export function DiaryView({
 function DiarySheet({
   projectId,
   entry,
+  canDelete,
+  onDelete,
+  onMessage,
   onClose,
   onSaved,
   onDeleteAttachment,
 }: {
   projectId: string;
   entry: Entry | null;
+  canDelete: boolean;
+  onDelete: (entry: Entry) => void;
+  onMessage: (message: string) => void;
   onClose: () => void;
   onSaved: (message: string) => void;
   onDeleteAttachment: (id: string) => void;
@@ -213,29 +270,22 @@ function DiarySheet({
   const [entryDate, setEntryDate] = useState(() => (entry ? entry.entryDate.slice(0, 10) : todayIST()));
   const [title, setTitle] = useState(entry?.title ?? '');
   const [body, setBody] = useState(entry?.body ?? '');
-  const [files, setFiles] = useState<FileList | null>(null);
   const [pending, setPending] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const idemKey = useRef<string>(newIdempotencyKey());
-  const uploadRef = useRef<HTMLInputElement>(null);
-
-  async function uploadFile(f: File, parentId?: string): Promise<string> {
-    const presign = await api.post<{ uploadUrl: string; attachmentId: string }>('/api/uploads/presign', {
-      projectId,
-      parentType: 'diary_entry',
-      filename: f.name,
-      mimeType: f.type,
-      size: f.size,
-    });
-    const put = await fetch(presign.uploadUrl, { method: 'PUT', body: f, headers: { 'Content-Type': f.type } });
-    if (!put.ok) throw new Error('Upload failed');
-    await api.post(`/api/uploads/${presign.attachmentId}/finalize`, parentId ? { diaryEntryId: parentId } : {});
-    return presign.attachmentId;
-  }
+  const uploads = useUploads(projectId, 'diary_entry', entry?.attachments.length ?? 0);
 
   async function submit(e: React.FormEvent) {
     e.preventDefault();
     setError(null);
+    if (uploads.busy) {
+      setError('Wait for uploads to finish.');
+      return;
+    }
+    if (uploads.failed) {
+      setError('Retry or remove the files that failed to upload.');
+      return;
+    }
     setPending(true);
     try {
       if (entry) {
@@ -245,11 +295,10 @@ function DiarySheet({
           body,
           version: entry.version,
         });
-        if (files) for (const f of Array.from(files)) await uploadFile(f, entry.id);
+        await uploads.finalizeAll({ diaryEntryId: entry.id });
         onSaved('Entry updated');
       } else {
-        const attachmentIds: string[] = [];
-        if (files) for (const f of Array.from(files)) attachmentIds.push(await uploadFile(f));
+        const attachmentIds = await uploads.finalizeAll();
         await api.post(
           `/api/projects/${projectId}/diary`,
           { entryDate: new Date(entryDate).toISOString(), title, body, attachmentIds },
@@ -272,12 +321,19 @@ function DiarySheet({
       title={entry ? 'Edit diary entry' : 'New diary entry'}
       footer={
         <div className="flex gap-2">
-          <Button variant="secondary" className="flex-1" onClick={onClose}>
-            Cancel
-          </Button>
-          <Button type="submit" form="diary-form" className="flex-1" loading={pending}>
-            Save
-          </Button>
+          {entry && canDelete && (
+            <Button variant="ghost" className="text-danger hover:bg-danger-tint" onClick={() => onDelete(entry)}>
+              <Trash2 size={16} aria-hidden /> Delete
+            </Button>
+          )}
+          <div className="flex flex-1 justify-end gap-2">
+            <Button variant="secondary" className="flex-1 md:flex-none" onClick={onClose}>
+              Cancel
+            </Button>
+            <Button type="submit" form="diary-form" className="flex-1 md:flex-none" loading={pending} disabled={uploads.busy}>
+              Save
+            </Button>
+          </div>
         </div>
       }
     >
@@ -295,27 +351,11 @@ function DiarySheet({
         {entry && entry.attachments.length > 0 && (
           <div>
             <span className="text-[13px] font-semibold text-ink-2">Attachments</span>
-            <AttachmentList attachments={entry.attachments} onDelete={onDeleteAttachment} />
+            <AttachmentList attachments={entry.attachments} thumbClass="h-16 w-16" onDelete={onDeleteAttachment} />
           </div>
         )}
 
-        <div>
-          <span className="text-[13px] font-semibold text-ink-2">{entry ? 'Add photos/files' : 'Photos & files'}</span>
-          <div className="mt-1">
-            <Button type="button" variant="secondary" onClick={() => uploadRef.current?.click()}>
-              <Upload size={16} aria-hidden /> Choose files
-            </Button>
-          </div>
-          <input
-            ref={uploadRef}
-            type="file"
-            accept="image/*,.pdf,.txt,.csv,.xls,.xlsx"
-            multiple
-            className="hidden"
-            onChange={(e) => setFiles(e.target.files)}
-          />
-          <p className="mt-1 text-xs text-ink-3">Images open in the app; PDFs and spreadsheets download only.</p>
-        </div>
+        <UploadPicker label={entry ? 'Add photos or files' : 'Photos and files'} uploads={uploads} onMessage={onMessage} />
 
         {error && <Alert message={error} />}
       </form>

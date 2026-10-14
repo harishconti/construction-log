@@ -9,6 +9,7 @@ import { Field, Select, TextInput } from '@/components/ui/inputs';
 import { Alert } from '@/components/ui/Alert';
 import { EmptyState } from '@/components/ui/EmptyState';
 import { ConfirmDialog } from '@/components/ui/ConfirmDialog';
+import { SkeletonRows } from '@/components/ui/Skeleton';
 import { useToast } from '@/components/ui/Toast';
 
 type Role = 'admin' | 'editor' | 'viewer';
@@ -153,7 +154,7 @@ export function MembersView({ projectId, currentUserId }: { projectId: string; c
       {error && <Alert message={error} onRetry={load} />}
 
       {loading ? (
-        <p className="text-sm text-ink-3">Loading…</p>
+        <SkeletonRows rows={3} trailing label="Loading members" />
       ) : (
         <>
           <ul className="divide-y divide-border overflow-hidden rounded-lg border border-border bg-surface">

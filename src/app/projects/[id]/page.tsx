@@ -3,7 +3,7 @@ import { DashboardChart, type ChartDatum } from '@/components/DashboardChart';
 import { StatusBadge, ProgressBar, type BudgetStatus } from '@/components/ui/StatusBadge';
 import { EmptyState } from '@/components/ui/EmptyState';
 import { computeVariance } from '@/lib/budget';
-import { formatDate, formatINR } from '@/lib/format';
+import { formatDate, formatDayLabel, formatINR } from '@/lib/format';
 import { periodRange, startOfMonthIST } from '@/lib/period';
 import { prisma } from '@/lib/prisma';
 
@@ -98,8 +98,8 @@ export default async function ProjectDashboard({ params }: { params: Promise<{ i
         />
       </div>
 
-      {/* Chart */}
-      <section className="rounded-lg border border-border bg-surface p-4">
+      {/* Chart: md+ only; phones get the progress rows below */}
+      <section className="hidden rounded-lg border border-border bg-surface p-4 md:block">
         <h2 className="font-display text-lg font-semibold">Planned vs actual</h2>
         <div className="mt-3">
           <DashboardChart data={chart} />
@@ -142,14 +142,22 @@ export default async function ProjectDashboard({ params }: { params: Promise<{ i
               <EmptyState title="No expenses yet." />
             </div>
           ) : (
-            <ul className="mt-3 divide-y divide-border">
+            <ul className="mt-2 divide-y divide-border">
               {recent.map((t) => (
-                <li key={t.id} className="flex items-center justify-between py-2 text-sm">
-                  <Link href={`/projects/${id}/transactions`} className="min-w-0 truncate text-ink-2 hover:text-ink">
-                    {t.category.name}
-                    {t.vendor ? ` · ${t.vendor}` : ''}
+                <li key={t.id}>
+                  <Link
+                    href={`/projects/${id}/transactions#tx-${t.id}`}
+                    className="-mx-2 flex min-h-11 items-center gap-3 rounded-md px-2 py-2 text-sm hover:bg-surface-2"
+                  >
+                    <span className="min-w-0 flex-1">
+                      <span className="block truncate font-medium">{t.vendor || t.category.name}</span>
+                      <span className="block truncate text-xs text-ink-3">
+                        {formatDayLabel(t.occurredAt)}
+                        {t.vendor ? ` · ${t.category.name}` : ''}
+                      </span>
+                    </span>
+                    <span className="num shrink-0 font-semibold">{formatINR(Number(t.amount))}</span>
                   </Link>
-                  <span className="num ml-2 shrink-0 font-medium">{formatINR(Number(t.amount))}</span>
                 </li>
               ))}
             </ul>
@@ -163,12 +171,15 @@ export default async function ProjectDashboard({ params }: { params: Promise<{ i
               <EmptyState title="No diary entries yet." />
             </div>
           ) : (
-            <ul className="mt-3 divide-y divide-border">
+            <ul className="mt-2 divide-y divide-border">
               {recentDiary.map((d) => (
-                <li key={d.id} className="flex items-center justify-between py-2 text-sm">
-                  <span className="text-ink-3">{formatDate(d.entryDate)}</span>
-                  <Link href={`/projects/${id}/diary`} className="ml-2 min-w-0 truncate text-primary hover:underline">
-                    {d.title}
+                <li key={d.id}>
+                  <Link
+                    href={`/projects/${id}/diary#entry-${d.id}`}
+                    className="-mx-2 flex min-h-11 items-center gap-3 rounded-md px-2 py-2 text-sm hover:bg-surface-2"
+                  >
+                    <span className="min-w-0 flex-1 truncate font-medium">{d.title}</span>
+                    <span className="shrink-0 text-xs text-ink-3">{formatDayLabel(d.entryDate)}</span>
                   </Link>
                 </li>
               ))}

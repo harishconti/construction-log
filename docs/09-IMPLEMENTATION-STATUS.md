@@ -120,6 +120,24 @@ Projects (status pills, "New project" sheet) are migrated onto the primitives; t
 grouped list with icons and sign-out. PWA now ships 192/512 + maskable PNG icons and an
 `apple-touch-icon`. `window.confirm`/`prompt` are gone from `src/`.
 
+**Design batch B7 — done** (remaining UI from the design audit): **shell** — 72px icon rail at `md`,
+248px sidebar at `lg`, sticky mobile top bar with a **project switcher**, bottom bar with an active
+pill and 12px labels. **Expenses** — `md+` table (date, vendor, category, paid by, bill, amount, ⋯)
+with a total footer (current page, labelled as such when paginated) and row-click edit; mobile rows lead
+with a bill thumbnail or icon tile, use the vendor as title, show "incl. ₹x GST", and mark deleted rows
+with a 12px badge + strike-through (no fading); debounced vendor search beside Filters; soft delete is
+immediate with an **"Expense deleted · Undo"** toast (`Toast` gained `action`); Delete sits in the edit
+sheet footer. **Uploads** — shared `UploadPicker`/`useUploads`: thumbnails, per-file XHR progress,
+retry, up to 10 files × 10 MB for expenses and diary. **Diary** — day headers on a rail, 3-up photo
+grid, Delete moved into the sheet footer. **Timeline** — migrated to tokens, day groups with
+expense/diary type tiles, deep links to the item. **Dashboard** — chart hidden below `md`, recent items
+link to the item (`#tx-<id>` / `#entry-<id>`) and show dates. **Project cards** show total spend and
+last activity. **Members** loading skeleton. **AttachmentList** — tokens, 32px delete chip in a 44px
+hit area, file-type icons. **Lightbox/Sheet/ConfirmDialog** share a focus trap; Lightbox adds swipe.
+Also: `Field` labels are now linked to their controls (`for`/`id`, `aria-describedby`), Add buttons
+and FABs are hidden from viewers, ⋯ menus render fixed (no clipping in `overflow-hidden` lists), and
+the danger button / lightbox controls keep contrast in dark mode.
+
 **Batch A3 — complete.** Rate limiting (fixed-window, Postgres-backed) on presign / transaction &
 diary creates / invites; DB `CHECK` constraints for enum-like columns; magic-byte content sniffing at
 finalize; and dependency upgrades — **React 19**, **Recharts 3**, **Vitest 5** (clears the dev-only
