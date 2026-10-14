@@ -16,5 +16,5 @@ export default async function TransactionsPage({ params }: { params: Promise<{ i
   });
   if (!membership) notFound();
 
-  return <TransactionsView projectId={id} currentUserId={user.id} role={membership.role} />;
+  return <TransactionsView projectId={id} role={membership.role} />;
 }

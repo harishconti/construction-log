@@ -41,6 +41,9 @@
   in `Asia/Kolkata`. Use `tabular-nums` for money columns.
 - **Nav**: `NavLink` renders active state + `aria-current`, with `lucide-react` icons; desktop sidebar
   and a mobile bottom bar (Dashboard / Expenses / Diary / More) that respects the safe-area inset.
+- **Primitives** (`src/components/ui/`): `Button`, `IconButton`, `Field` + `TextInput`/`DateInput`/`Textarea`/
+  `Select`/`MoneyInput`/`Segmented`, `Sheet` (bottom sheet on mobile / right drawer at md+), `ConfirmDialog`,
+  `Toast` (`useToast`, aria-live), `Alert`, `Skeleton`, `StatusBadge`, `ProgressBar`, `EmptyState`, `Lightbox`.
 
 ## Key UI Patterns
 - **Mobile-first**: bottom tab bar on mobile (Dashboard / Transactions / Diary / More), sidebar on desktop.
@@ -65,9 +68,11 @@
   GST as an included component, never added on top.
 - **Offline**: forms clearly show **unsaved** state; there is no offline write sync in v1. Do not
   imply queued writes.
-- **Transactions**: filters (category, payment mode, vendor, date range) + pagination; admins can
-  soft-delete/restore ("Show deleted"); editors can edit any transaction; attachments can be added or
-  removed inline. Bill thumbnails open in a lightbox; non-images show as download chips.
+- **Transactions**: a **Sheet** (bottom sheet on mobile / right drawer on desktop) for add/edit with a
+  large `MoneyInput`, category, date, GST, payment mode (`Segmented`), vendor and notes; **Camera/Upload**
+  buttons; a mobile **FAB**; a filter Sheet with removable chips; list grouped by day with daily totals;
+  row actions in an overflow menu; `ConfirmDialog` for deletes; toasts on save/delete. Amounts use
+  `formatINR` + tabular numerals.
 - **Diary**: author/admin edit inline (add/remove photos on edit); admin delete. Photos open in the
   same lightbox.
 - **Timeline**: transactions and diary merged chronologically, with a date filter and pagination.

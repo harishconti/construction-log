@@ -96,8 +96,17 @@ ring, `src/lib/format.ts` (`formatINR`, IST `formatDate`/`formatDayLabel`), `vie
 `NavLink` with active state + `aria-current` and `lucide-react` icons, desktop sidebar, mobile bottom
 bar with icons and safe-area padding, `max-w-[1200px]` content.
 
-**Design batch B3–B4 & A3/B5–B6 — pending** (UI primitives + transactions sheet/FAB/filters; hardening;
-dashboard/budgets rework; polish/PWA assets).
+**Design batch B3–B4 — done** (primitives & Transactions): `src/components/ui/` gains `Button`,
+`IconButton`, `Field` + inputs (`MoneyInput` with ₹/decimal/grouping, `Segmented`), `Sheet`
+(bottom-sheet/drawer), `ConfirmDialog`, `Toast`, `Alert`, `Skeleton`, `StatusBadge`/`ProgressBar`,
+`EmptyState` and a rebuilt `Lightbox` (focus, prev/next, caption). The Transactions screen is rebuilt on
+them: sheet add/edit, mobile FAB, filter sheet + chips, day grouping with daily totals, overflow action
+menu, confirm dialogs and toasts. `window.confirm`/`prompt` are being phased out.
+
+**Batch A3 & B5–B6 — pending** (hardening: rate limiting, security headers, magic-byte sniff,
+backup/restore hardening, dependency upgrades, enum/CHECK constraints; design: dashboard/budgets rework
+and remaining polish across diary/dashboard/login/members + PWA PNG icons; migrate remaining screens to
+the primitives).
 
 ## Not yet implemented (backlog)
 1. **Magic link**: UI is wired (`signIn.magicLink`), but the branch reports `magicLink.enabled: false`

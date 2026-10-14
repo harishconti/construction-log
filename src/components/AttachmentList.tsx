@@ -1,7 +1,7 @@
 'use client';
 
 import { useState } from 'react';
-import { Lightbox } from '@/components/Lightbox';
+import { Lightbox } from '@/components/ui/Lightbox';
 
 export type AttachmentItem = {
   id: string;
@@ -33,19 +33,20 @@ export function AttachmentList({
   thumbClass?: string;
   onDelete?: (id: string) => void;
 }) {
-  const [lightbox, setLightbox] = useState<string | null>(null);
+  const [lightboxIndex, setLightboxIndex] = useState<number | null>(null);
 
   if (attachments.length === 0) return null;
 
   const images = attachments.filter((a) => a.viewable && a.url);
   const files = attachments.filter((a) => !(a.viewable && a.url));
+  const current = lightboxIndex != null ? images[lightboxIndex] : null;
 
   return (
     <>
       <div className="mt-3 flex flex-wrap gap-3">
-        {images.map((a) => (
+        {images.map((a, i) => (
           <div key={a.id} className="relative">
-            <button type="button" onClick={() => setLightbox(a.url)} className="block">
+            <button type="button" onClick={() => setLightboxIndex(i)} className="block">
               {/* eslint-disable-next-line @next/next/no-img-element */}
               <img src={a.url} alt={a.originalName ?? ''} className={`${thumbClass} rounded-lg object-cover`} />
             </button>
@@ -66,7 +67,17 @@ export function AttachmentList({
           </div>
         ))}
       </div>
-      <Lightbox url={lightbox} onClose={() => setLightbox(null)} />
+      <Lightbox
+        url={current?.url ?? null}
+        caption={current?.originalName ?? undefined}
+        onClose={() => setLightboxIndex(null)}
+        onPrev={lightboxIndex != null && lightboxIndex > 0 ? () => setLightboxIndex((i) => (i ?? 0) - 1) : undefined}
+        onNext={
+          lightboxIndex != null && lightboxIndex < images.length - 1
+            ? () => setLightboxIndex((i) => (i ?? 0) + 1)
+            : undefined
+        }
+      />
     </>
   );
 }
