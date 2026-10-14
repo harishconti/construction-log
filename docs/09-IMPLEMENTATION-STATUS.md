@@ -35,29 +35,38 @@ Migrations: `init`, `attachment_parent_check`, `idempotency_response`, `object_d
 | Diary | `GET/POST /api/projects/:id/diary`; `PATCH/DELETE /api/projects/:id/diary/:entryId` |
 | Budgets | `GET/POST /api/projects/:id/budgets`; `PATCH /api/projects/:id/budgets/:budgetId`; `GET …/revisions` |
 | Feed | `GET /api/projects/:id/timeline`; `GET /api/projects/:id/dashboard` |
-| Uploads | `POST /api/uploads/presign`; `POST /api/uploads/:attachmentId/finalize`; `DELETE /api/attachments/:id` |
+| Uploads | `POST /api/uploads/presign`; `POST /api/uploads/:attachmentId/finalize`; `GET /api/attachments/:id/download`; `DELETE /api/attachments/:id` |
 | Maintenance | `GET/POST /api/maintenance/cleanup` (secret-protected) |
 
 ## UI pages (implemented)
 `/login` (Neon Auth: password + magic-link option) · `/projects` (list/create) · `/projects/:id`
 (Dashboard + chart) · `/transactions` (admin soft-delete/restore + "show deleted") · `/diary`
 (author/admin edit, admin delete) · `/budgets` · `/members` (admin) · `/settings` (admin, project +
-categories). Shared full-screen image lightbox for bills and diary photos.
+categories). Attachments render as image thumbnails (lightbox) or document download chips; document
+uploads accepted on both diary and transactions.
 Nav: mobile bottom tabs / desktop sidebar; admin-only links for Members and Settings.
 PWA: `manifest.json` + service worker (`public/sw.js`, registered in production).
 
 ## Behaviour implemented
 - **Auth**: Neon Auth sign-up/in via same-origin proxy; server `getSession`; user mirror upsert.
 - **Authorization**: `requireRole(projectId, userId, minRole)` on every route; project isolation via `projectId` scoping; last-admin safeguard; editor-any transaction edits (admin-only delete/restore); diary author/admin edits, admin delete.
-- **Uploads**: presign → browser PUT direct to R2 → finalize (HeadObject verifies existence/size) → link on create; private reads via signed GET; delete removes object (deferred retry on failure).
+- **Uploads**: presign → browser PUT direct to R2 → finalize (HeadObject verifies existence/size,
+  re-checks the size cap) → link on create. Images render inline via signed GET; **all other types are
+  download-only** through `GET /api/attachments/:id/download` (`octet-stream`, `attachment`, `nosniff`).
+  Type allowlist (jpeg/png/webp/gif inline; pdf/txt/csv/xls/xlsx/heic/heif download-only), 10 MB per
+  file, ≤10 per record. Delete removes the object (deferred retry on failure).
 - **Correctness**: `Idempotency-Key` on transaction/diary create; `version` optimistic locking (409 on stale); audit log written in the same Prisma transaction.
 - **Budgets**: planned vs derived actual (`SUM(amount)`), variance + status (green<80 / yellow 80–100 / red>100); revisions append-only.
 - **Time**: `Asia/Kolkata` boundaries; weeks start Monday.
 - **Maintenance**: reaps `pending` uploads older than 24h and retries deferred R2 deletions (attempt cap + TTL).
 
 ## Verification
-- `npm run typecheck`, `npm run lint`, `npm test` (**29 unit tests**: roles, validation, period/budget math, maintenance auth), `npm run build` — all green.
-- Manual e2e against a real Neon project + R2 bucket: auth sign-up/session; project/category/transaction/diary/budget CRUD; optimistic-lock 409; idempotent replay; two-phase upload (PUT→finalize→link); attachment delete; budgets variance + revision history; timeline merge; dashboard totals; cleanup reap+delete.
+- `npm run typecheck`, `npm run lint`, `npm test` (**40 unit tests**: roles, validation, period/budget
+  math, maintenance auth, file policy), `npm run build` — all green.
+- Manual e2e against a real Neon project + R2 bucket: auth sign-up/session; project/category/transaction/
+  diary/budget CRUD; optimistic-lock 409; idempotent replay; two-phase upload (PUT→finalize→link);
+  attachment delete; budgets variance + revision history; timeline merge; dashboard totals; cleanup
+  reap+delete; document upload + forced-download headers + rejected HTML; unauth download 401.
 
 ## Not yet implemented (backlog)
 1. **Magic link**: UI is wired (`signIn.magicLink`), but the branch reports `magicLink.enabled: false`
@@ -67,6 +76,7 @@ PWA: `manifest.json` + service worker (`public/sw.js`, registered in production)
 4. **R2 CORS**: allow `localhost:3000` (+ production origin) for PUT/GET/HEAD.
 5. **Release process**: production `prisma migrate deploy`; encrypted backups (7 daily / 4 weekly); separate prod bucket/credentials.
 6. **Dev/prod isolation**: local dev currently targets the default (production) Neon branch — create a `dev` branch.
+7. **Optional hardening**: malware/AV scanning on finalize; magic-byte content sniffing to reject mismatched types (defence in depth).
 
 ## Environment variables
 `DATABASE_URL`, `DIRECT_URL`, `NEON_AUTH_BASE_URL`, `NEON_AUTH_COOKIE_SECRET`, `NEXT_PUBLIC_APP_URL`

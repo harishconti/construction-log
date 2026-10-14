@@ -60,16 +60,29 @@ describe('updateTransactionSchema', () => {
 });
 
 describe('presignSchema', () => {
-  it('accepts supported image mime types', () => {
-    expect(
-      presignSchema.safeParse({ projectId: 'p1', parentType: 'transaction', mimeType: 'image/jpeg' }).success,
-    ).toBe(true);
+  const base = { projectId: 'p1', parentType: 'transaction' as const, filename: 'bill.jpg' };
+
+  it('accepts supported image and document types with a filename', () => {
+    expect(presignSchema.safeParse({ ...base, mimeType: 'image/jpeg' }).success).toBe(true);
+    expect(presignSchema.safeParse({ ...base, filename: 'invoice.pdf', mimeType: 'application/pdf' }).success).toBe(
+      true,
+    );
   });
 
-  it('rejects non-image mime types', () => {
-    expect(
-      presignSchema.safeParse({ projectId: 'p1', parentType: 'transaction', mimeType: 'application/pdf' }).success,
-    ).toBe(false);
+  it('requires a filename', () => {
+    expect(presignSchema.safeParse({ projectId: 'p1', parentType: 'transaction', mimeType: 'image/png' }).success).toBe(
+      false,
+    );
+  });
+
+  it('rejects disallowed types like html and svg', () => {
+    expect(presignSchema.safeParse({ ...base, mimeType: 'text/html' }).success).toBe(false);
+    expect(presignSchema.safeParse({ ...base, mimeType: 'image/svg+xml' }).success).toBe(false);
+  });
+
+  it('rejects sizes above the category limit', () => {
+    expect(presignSchema.safeParse({ ...base, mimeType: 'image/png', size: 11 * 1024 * 1024 }).success).toBe(false);
+    expect(presignSchema.safeParse({ ...base, mimeType: 'image/png', size: 5 * 1024 * 1024 }).success).toBe(true);
   });
 });
 

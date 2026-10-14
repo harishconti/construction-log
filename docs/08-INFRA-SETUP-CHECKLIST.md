@@ -187,7 +187,7 @@ CORS is not authorization. Bucket stays private; temporary signed URLs are issue
 
 Never send full image bytes through Vercel as the default flow. Never trust arbitrary client object keys. Never store signed URLs as permanent file URLs.
 
-Suggested initial policy: ten images per record, 10 MB each, JPEG/PNG/WebP; show clear unsupported-HEIC feedback. Preserve readable original bills. Attachments have explicit transaction_id OR diary_entry_id with a database check enforcing exactly one parent when attached. Pending uploads need a separate documented state/constraint.
+Suggested initial policy: up to ten attachments per record, 10 MB each. Inline-viewable images are JPEG/PNG/WebP/GIF; PDF, plain text, CSV and XLS/XLSX are accepted as download-only, as are HEIC/HEIF (not viewable inline). Show clear feedback for unsupported types (including active types such as HTML/SVG). Preserve readable original bills. Attachments have explicit transaction_id OR diary_entry_id with a database check enforcing exactly one parent when attached. Pending uploads need a separate documented state/constraint. Only raster images may be rendered inline; serve every other type as a forced download (octet-stream, attachment, nosniff) — never from a public bucket or inline.
 
 ## 7. Vercel setup
 

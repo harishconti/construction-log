@@ -2,9 +2,8 @@
 
 import { useCallback, useEffect, useState } from 'react';
 import { api } from '@/lib/api-client';
-import { Lightbox } from '@/components/Lightbox';
+import { AttachmentList, type AttachmentItem } from '@/components/AttachmentList';
 
-type Attachment = { id: string; url: string; mimeType: string };
 type Entry = {
   id: string;
   entryDate: string;
@@ -12,7 +11,7 @@ type Entry = {
   body: string;
   createdBy: string;
   version: number;
-  attachments: Attachment[];
+  attachments: AttachmentItem[];
 };
 
 export function DiaryView({
@@ -29,7 +28,6 @@ export function DiaryView({
   const [error, setError] = useState<string | null>(null);
   const [showForm, setShowForm] = useState(false);
   const [editingId, setEditingId] = useState<string | null>(null);
-  const [lightbox, setLightbox] = useState<string | null>(null);
 
   const isAdmin = role === 'admin';
 
@@ -136,23 +134,12 @@ export function DiaryView({
                   )}
                 </div>
                 {e.body && <p className="mt-1 whitespace-pre-wrap text-sm text-slate-600">{e.body}</p>}
-                {e.attachments.length > 0 && (
-                  <div className="mt-3 flex gap-2 overflow-x-auto">
-                    {e.attachments.map((a) => (
-                      <button key={a.id} type="button" onClick={() => setLightbox(a.url)} className="shrink-0">
-                        {/* eslint-disable-next-line @next/next/no-img-element */}
-                        <img src={a.url} alt="" className="h-24 w-24 rounded-lg object-cover" />
-                      </button>
-                    ))}
-                  </div>
-                )}
+                <AttachmentList attachments={e.attachments} />
               </li>
             );
           })}
         </ol>
       )}
-
-      <Lightbox url={lightbox} onClose={() => setLightbox(null)} />
     </div>
   );
 }
@@ -179,6 +166,7 @@ function DiaryForm({
     const presign = await api.post<{ uploadUrl: string; attachmentId: string }>('/api/uploads/presign', {
       projectId,
       parentType: 'diary_entry',
+      filename: f.name,
       mimeType: f.type,
       size: f.size,
     });
@@ -204,7 +192,6 @@ function DiaryForm({
         const attachmentIds: string[] = [];
         if (files) {
           for (const f of Array.from(files)) {
-            if (!f.type.startsWith('image/')) continue;
             attachmentIds.push(await uploadPhoto(f));
           }
         }
@@ -253,15 +240,18 @@ function DiaryForm({
       </label>
       {!entry && (
         <label className="block text-sm">
-          <span className="text-slate-700">Photos (up to 10)</span>
+          <span className="text-slate-700">Photos &amp; files (up to 10)</span>
           <input
             type="file"
-            accept="image/*"
+            accept="image/*,.pdf,.txt,.csv,.xls,.xlsx"
             capture="environment"
             multiple
             onChange={(e) => setFiles(e.target.files)}
             className="mt-1 block w-full text-sm"
           />
+          <span className="mt-1 block text-xs text-slate-400">
+            Images open in the app; PDF/text/spreadsheet files download only.
+          </span>
         </label>
       )}
       {error && <p className="text-sm text-red-600">{error}</p>}

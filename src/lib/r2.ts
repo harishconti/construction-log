@@ -7,14 +7,7 @@ import {
   S3Client,
 } from '@aws-sdk/client-s3';
 import { getSignedUrl } from '@aws-sdk/s3-request-presigner';
-
-const EXT_BY_MIME: Record<string, string> = {
-  'image/jpeg': 'jpg',
-  'image/png': 'png',
-  'image/webp': 'webp',
-  'image/heic': 'heic',
-  'image/heif': 'heif',
-};
+import { extensionFor } from './files';
 
 function config() {
   const accountId = process.env.R2_ACCOUNT_ID;
@@ -55,7 +48,7 @@ function s3(): S3Client {
 }
 
 export function buildObjectKey(projectId: string, parentType: string, mimeType: string): string {
-  const ext = EXT_BY_MIME[mimeType] ?? 'bin';
+  const ext = extensionFor(mimeType);
   return `projects/${projectId}/${parentType}/${randomUUID()}.${ext}`;
 }
 
@@ -74,6 +67,17 @@ export async function getReadUrl(fileKey: string): Promise<string> {
   return getSignedUrl(s3(), new GetObjectCommand({ Bucket: c.bucket, Key: fileKey }), {
     expiresIn: 3600,
   });
+}
+
+/** Streams an object for app-proxied downloads (never exposes the raw object URL). */
+export async function getObjectStream(
+  fileKey: string,
+): Promise<{ body: ReadableStream; contentLength: number | null }> {
+  const c = config();
+  const res = await s3().send(new GetObjectCommand({ Bucket: c.bucket, Key: fileKey }));
+  const body = res.Body?.transformToWebStream() as ReadableStream | undefined;
+  if (!body) throw new Error('Object body is empty');
+  return { body, contentLength: typeof res.ContentLength === 'number' ? res.ContentLength : null };
 }
 
 /** Returns the stored object's size in bytes, or null if the object does not exist. */

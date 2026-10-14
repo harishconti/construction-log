@@ -132,6 +132,7 @@ model Attachment {
   diaryEntryId  String?
   status        String   @default("pending") // 'pending' | 'ready'
   fileKey       String // server-generated R2 object key; clients never supply this
+  originalName  String? // client filename, sanitized, used only for the download header
   mimeType      String
   size          Int? // bytes, verified at finalize
   checksum      String? // optional content hash

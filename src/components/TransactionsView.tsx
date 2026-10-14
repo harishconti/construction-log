@@ -2,10 +2,9 @@
 
 import { useCallback, useEffect, useState } from 'react';
 import { api } from '@/lib/api-client';
-import { Lightbox } from '@/components/Lightbox';
+import { AttachmentList, type AttachmentItem } from '@/components/AttachmentList';
 
 type Category = { id: string; name: string; type: string };
-type Attachment = { id: string; url: string; mimeType: string };
 type Transaction = {
   id: string;
   occurredAt: string;
@@ -17,7 +16,7 @@ type Transaction = {
   version: number;
   deletedAt: string | null;
   category: { id: string; name: string };
-  attachments: Attachment[];
+  attachments: AttachmentItem[];
 };
 
 const PAYMENT_MODES = ['cash', 'upi', 'bank', 'card', 'credit'];
@@ -36,7 +35,6 @@ export function TransactionsView({
   const [error, setError] = useState<string | null>(null);
   const [showForm, setShowForm] = useState(false);
   const [showDeleted, setShowDeleted] = useState(false);
-  const [lightbox, setLightbox] = useState<string | null>(null);
 
   const isAdmin = role === 'admin';
 
@@ -151,22 +149,11 @@ export function TransactionsView({
                     ))}
                 </div>
               </div>
-              {t.attachments.length > 0 && (
-                <div className="mt-2 flex gap-2 overflow-x-auto">
-                  {t.attachments.map((a) => (
-                    <button key={a.id} type="button" onClick={() => setLightbox(a.url)} className="shrink-0">
-                      {/* eslint-disable-next-line @next/next/no-img-element */}
-                      <img src={a.url} alt="" className="h-16 w-16 rounded-lg object-cover" />
-                    </button>
-                  ))}
-                </div>
-              )}
+              <AttachmentList attachments={t.attachments} thumbClass="h-16 w-16" />
             </li>
           ))}
         </ul>
       )}
-
-      <Lightbox url={lightbox} onClose={() => setLightbox(null)} />
     </div>
   );
 }
@@ -196,7 +183,7 @@ function TransactionForm({
   async function uploadPhoto(f: File): Promise<string> {
     const presign = await api.post<{ uploadUrl: string; fileKey: string; attachmentId: string }>(
       '/api/uploads/presign',
-      { projectId, parentType: 'transaction', mimeType: f.type, size: f.size },
+      { projectId, parentType: 'transaction', filename: f.name, mimeType: f.type, size: f.size },
     );
     const put = await fetch(presign.uploadUrl, {
       method: 'PUT',
@@ -214,11 +201,11 @@ function TransactionForm({
     setPending(true);
     try {
       const attachmentIds: string[] = [];
-      if (file && file.type.startsWith('image/')) {
+      if (file) {
         try {
           attachmentIds.push(await uploadPhoto(file));
         } catch (uploadErr) {
-          setError(uploadErr instanceof Error ? uploadErr.message : 'Photo upload failed');
+          setError(uploadErr instanceof Error ? uploadErr.message : 'Upload failed');
           return;
         }
       }
@@ -338,10 +325,10 @@ function TransactionForm({
       </label>
 
       <label className="block text-sm">
-        <span className="text-slate-700">Bill photo (optional)</span>
+        <span className="text-slate-700">Bill photo or file (optional)</span>
         <input
           type="file"
-          accept="image/*"
+          accept="image/*,.pdf,.txt,.csv,.xls,.xlsx"
           capture="environment"
           onChange={(e) => setFile(e.target.files?.[0] ?? null)}
           className="mt-1 block w-full text-sm"

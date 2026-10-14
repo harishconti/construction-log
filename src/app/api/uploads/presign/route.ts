@@ -3,6 +3,7 @@ import { requireUser } from '@/lib/auth';
 import { prisma } from '@/lib/prisma';
 import { requireRole } from '@/lib/requireRole';
 import { buildObjectKey, isR2Configured, presignPutUrl } from '@/lib/r2';
+import { sanitizeFilename } from '@/lib/files';
 import { presignSchema } from '@/lib/validation/schemas';
 
 export const POST = handle(async (req) => {
@@ -24,6 +25,7 @@ export const POST = handle(async (req) => {
       projectId: body.projectId,
       status: 'pending',
       fileKey,
+      originalName: sanitizeFilename(body.filename),
       mimeType: body.mimeType,
       size: body.size ?? null,
       uploadedBy: user.id,

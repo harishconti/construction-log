@@ -31,8 +31,12 @@
   (select), amount, GST, vendor, payment mode, description, photo upload (camera capture on mobile
   via `<input type="file" accept="image/*" capture="environment">`).
 - **Upload UX (direct-to-R2)**: on save, presign → PUT to R2 → finalize → link. Show a per-file
-  progress/pending state; retry on failure. Accepted: JPEG/PNG/WebP, up to 10 files per record, 10 MB
-  each. Show a clear **unsupported-HEIC** message (do not silently drop).
+  progress/pending state; retry on failure. Accepted: images (jpeg/png/webp/gif) and files
+  (pdf/txt/csv/xls/xlsx); heic/heif accepted but download-only. Up to **10 files per record, 10 MB
+  each**. Images show as thumbnails (tap → lightbox); non-images render as download chips. Unsupported
+  types are rejected with a clear message, not silently dropped.
+- **Safety**: only images are ever rendered inline. Documents are served as forced downloads
+  (`attachment`, `octet-stream`, `nosniff`) — the app never renders or executes uploaded files.
 - **Diary timeline**: vertical timeline; each entry = card with date, title, body, horizontal-scroll
   photo gallery; tap photo → full-screen lightbox.
 - **Budget view**: toggle Week/Month; table with columns Category | Planned | Actual | Variance |

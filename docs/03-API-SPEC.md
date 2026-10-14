@@ -60,16 +60,24 @@ member of project A cannot read or write project B.
 | PATCH | /api/projects/:id/diary/:entryId | Update | author or admin |
 | DELETE | /api/projects/:id/diary/:entryId | Delete | admin |
 
-## Attachments / Uploads (two-phase, direct-to-R2) _(finalize: to implement)_
+## Attachments / Uploads (two-phase, direct-to-R2)
 | Method | Path | Description | Min Role |
 |---|---|---|---|
-| POST | /api/uploads/presign | Validate session+membership+role+MIME/size; create `pending` attachment; return presigned PUT URL + server-generated `fileKey` | editor |
-| POST | /api/uploads/:attachmentId/finalize | Verify object exists + size/metadata; mark `ready`; link to parent | editor |
+| POST | /api/uploads/presign | Validate session+membership+role+filename+type allowlist+size; create `pending` attachment; return presigned PUT URL + server-generated `fileKey` | editor |
+| POST | /api/uploads/:attachmentId/finalize | Verify object exists + re-check size ≤ cap; mark `ready`; optionally link to parent | editor |
+| GET | /api/attachments/:id/download | Stream a file as a forced download (auth + membership) | viewer |
 | DELETE | /api/attachments/:id | Delete attachment (own upload, or admin); removes R2 object + row | editor (own) / admin |
 
 - Flow: **presign → browser PUT direct to R2 → finalize → link to record**. Image bytes never pass
   through Vercel. MIME allowlist and size are enforced server-side; object keys are never trusted
-  from the client. Reads return short-lived signed GET URLs after membership checks.
+  from the client.
+- **Allowed types**: inline-viewable raster images (`image/jpeg|png|webp|gif`); download-only
+  (`application/pdf`, `text/plain`, `text/csv`, `application/vnd.ms-excel` (xls),
+  `…spreadsheetml.sheet` (xlsx), `image/heic|heif`). Active types (`text/html`, `image/svg+xml`,
+  JS, archives) are rejected with 422. Per-file cap **10 MB**; up to **10 files per record**.
+- **Serving**: images get a short-lived signed GET and render inline. **Non-images get no signed URL** —
+  they are served only by `GET /api/attachments/:id/download` as `application/octet-stream` with
+  `Content-Disposition: attachment`, `X-Content-Type-Options: nosniff`, and `Cache-Control: private, no-store`.
 
 ## Budgets
 | Method | Path | Description | Min Role |
@@ -112,8 +120,9 @@ All errors return `{ error: string, code: string }` with an appropriate HTTP sta
 ## Implementation Status
 Implemented: Neon Auth proxy; projects/members/categories; transactions (list/create/update/delete/
 restore) with two-phase R2 upload linking, editor-any edits, optimistic locking and idempotency;
-diary (list/create/update/delete) with multi-image linking; budgets (list with derived actual +
-variance, create/upsert, revise with revision history); timeline; dashboard; maintenance cleanup.
+diary (list/create/update/delete) with multi-file linking; budgets (list with derived actual +
+variance, create/upsert, revise with revision history); timeline; dashboard; maintenance cleanup;
+attachment policy (type allowlist, size caps) with app-proxied downloads for non-images.
 
-Pending: Members/Settings UI screens (APIs exist); PWA service worker; Neon Auth trusted-origin
-configuration; production `prisma migrate deploy` release process.
+Pending: magic-link activation on the branch; Neon Auth trusted-origin configuration; R2 CORS;
+production `prisma migrate deploy` release process.

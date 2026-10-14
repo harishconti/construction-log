@@ -5,6 +5,7 @@ import { requireRole } from '@/lib/requireRole';
 import { writeAudit } from '@/lib/audit';
 import { headObjectSize, isR2Configured } from '@/lib/r2';
 import { serializeAttachment } from '@/lib/serialize';
+import { sizeLimitFor } from '@/lib/files';
 import { finalizeAttachmentSchema } from '@/lib/validation/schemas';
 
 type Ctx = { params: Promise<{ attachmentId: string }> };
@@ -49,6 +50,15 @@ export const POST = handle<Ctx>(async (req, { params: paramsPromise }) => {
   const size = await headObjectSize(attachment.fileKey);
   if (size === null) {
     throw new ApiError(400, 'UPLOAD_NOT_FOUND', 'Uploaded object was not found in storage');
+  }
+
+  const limit = sizeLimitFor(attachment.mimeType);
+  if (size > limit) {
+    // Oversize: queue the object for deletion and reject.
+    await prisma.objectDeletion.create({
+      data: { projectId: attachment.projectId, fileKey: attachment.fileKey, lastError: 'oversize upload' },
+    });
+    throw new ApiError(400, 'FILE_TOO_LARGE', `File exceeds the ${Math.round(limit / (1024 * 1024))} MB limit`);
   }
 
   const updated = await prisma.$transaction(async (tx) => {

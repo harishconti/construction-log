@@ -1,4 +1,5 @@
 import { z } from 'zod';
+import { isAllowedMime, sizeLimitFor } from '../files';
 import { ROLES } from '../roles';
 
 export const paymentModeSchema = z.enum(['cash', 'upi', 'bank', 'card', 'credit']);
@@ -167,12 +168,23 @@ export const updateBudgetSchema = z.object({
 // Uploads
 // ---------------------------------------------------------------------------
 
-export const presignSchema = z.object({
-  projectId: z.string().min(1),
-  parentType: parentTypeSchema,
-  mimeType: z.string().regex(/^image\/(jpeg|png|webp|heic|heif)$/, 'Unsupported image type'),
-  size: z.number().int().positive().max(15 * 1024 * 1024).optional(),
-});
+export const presignSchema = z
+  .object({
+    projectId: z.string().min(1),
+    parentType: parentTypeSchema,
+    filename: z.string().trim().min(1).max(255),
+    mimeType: z.string().refine(isAllowedMime, 'Unsupported file type'),
+    size: z.number().int().positive().optional(),
+  })
+  .superRefine((val, ctx) => {
+    if (val.size !== undefined && val.size > sizeLimitFor(val.mimeType)) {
+      ctx.addIssue({
+        code: z.ZodIssueCode.custom,
+        path: ['size'],
+        message: `File exceeds the ${Math.round(sizeLimitFor(val.mimeType) / (1024 * 1024))} MB limit`,
+      });
+    }
+  });
 
 /** Optional: attach a finalized upload directly to an existing record. */
 export const finalizeAttachmentSchema = z

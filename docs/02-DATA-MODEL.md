@@ -117,14 +117,15 @@ model DiaryEntry {
 model Attachment {
   id            String   @id @default(cuid())
   projectId     String
-  // Exactly one parent once attached; enforced by a CHECK constraint (to implement).
+  // Exactly one parent once attached; enforced by a CHECK constraint.
   transactionId String?
   diaryEntryId  String?
-  status        String   @default("pending") // 'pending' | 'ready' (to implement)
+  status        String   @default("pending") // 'pending' | 'ready'
   fileKey       String   // server-generated R2 object key; never trust a client key
+  originalName  String?  // sanitized client filename (download header only)
   mimeType      String
-  size          Int?     // bytes, verified at finalize (to implement)
-  checksum      String?  // optional content hash (to implement)
+  size          Int?     // bytes, verified at finalize
+  checksum      String?  // optional content hash (not populated)
   uploadedBy    String
   uploadedAt    DateTime @default(now())
 
@@ -222,11 +223,14 @@ model ObjectDeletion {
 - **Auth identity** — `User.id` is the verified Neon Auth user id; the row is a local mirror so
   `createdBy`/`uploadedBy` FKs stay intact. Neon Auth owns credentials.
 - **Attachments are private and server-keyed** — the server generates `fileKey`; clients never supply
-  object keys. Reads use short-lived signed GET URLs, never a stored public URL.
+  object keys. Only **raster images** are served inline (short-lived signed GET); every other type is
+  download-only via an app-proxied endpoint (`GET /api/attachments/:id/download`). No public URL is stored.
+- **Allowed types** — inline: jpeg/png/webp/gif; download-only: pdf/txt/csv/xls/xlsx/heic/heif. Active
+  types (html, svg, js, archives) are rejected. Per-file cap 10 MB; ≤10 files per record.
 - **Exactly-one-parent** — an attached `Attachment` references either a `transaction` or a
-  `diary_entry`, enforced by a DB `CHECK` (pending rows have neither). _(to implement)_
+  `diary_entry`, enforced by a DB `CHECK` (pending rows have neither).
 - **Two-phase upload** — `pending` row at presign, `ready` after the object is verified. A scheduled
-  job reclaims orphaned `pending` rows and retries R2 deletions. _(to implement)_
+  job reclaims orphaned `pending` rows and retries R2 deletions.
 - **Soft delete** on `Transaction` (`deletedAt`) — preserves history; admin can restore. Budget
   "actual" excludes soft-deleted rows; refunds/credits are modelled as negative or reversed rows
   (documented per project).
@@ -246,9 +250,9 @@ model ObjectDeletion {
 
 ## Implementation Status
 Implemented (migrations under `prisma/migrations`: `init`, `attachment_parent_check`,
-`idempotency_response`, `object_deletion_queue`): `User.id` = Neon Auth id with no `passwordHash`;
-`version` columns on Project/Transaction/DiaryEntry/Budget; `Attachment` with
-`transactionId`/`diaryEntryId`/`status`/`size`; the `attachment_parent_check` and
+`idempotency_response`, `object_deletion_queue`, `attachment_original_name`): `User.id` = Neon Auth id
+with no `passwordHash`; `version` columns on Project/Transaction/DiaryEntry/Budget; `Attachment` with
+`transactionId`/`diaryEntryId`/`status`/`size`/`originalName`; the `attachment_parent_check` and
 `attachment_status_check` CHECK constraints; `IdempotencyKey` with a stored `response`;
 `ObjectDeletion` retry queue. Prisma uses pooled `DATABASE_URL` + direct `DIRECT_URL`.
 
