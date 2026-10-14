@@ -40,11 +40,16 @@ E2E_ALLOW_WRITES=1 E2E_EMAIL=... E2E_PASSWORD=... npm run test:e2e
 - Only against a **Neon dev branch** (+ dev R2 bucket) — never production. Check `DATABASE_URL`
   before running; local `.env` has historically pointed at production.
 - Needs an email/password account on that branch's Neon Auth.
-- Creates a project `E2E <timestamp>` (no project delete API — it's marked `completed` afterwards).
-- Covers: create project → admin + default categories; add expense via FAB sheet; GST > amount → 400
-  `INVALID_GST`; edit bumps `version`, stale write → 409 `VERSION_CONFLICT`; `Idempotency-Key` replay
-  returns the same row, reuse with a different body → 409; admin delete + Undo toast; diary entry;
-  unknown project → 404.
+- Each spec creates its own project (`E2E <timestamp>`, `E2E admin <timestamp>`); there's no project
+  delete API, so they're marked `completed` afterwards.
+- `ledger.spec.ts` (UI, mobile): create project → admin + default categories; add expense via FAB
+  sheet; GST > amount → 400 `INVALID_GST`; edit bumps `version`, stale write → 409
+  `VERSION_CONFLICT`; `Idempotency-Key` replay returns the same row, reuse with a different body →
+  409; admin delete + Undo toast; diary entry; no horizontal overflow on any page; unknown project → 404.
+- `admin.spec.ts` (API, own project): soft-deleted expenses excluded from dashboard/budgets/timeline/
+  recent and back after restore; deleted rows can't be edited; budget upsert 201→200; variance status
+  green/yellow/red; revisions append-only newest-first; stale budget write → 409; pending invitation
+  create/cancel; last admin can't be demoted/removed (409).
 
 ## Writing tests
 - Locate by role/label like a user: `getByRole('dialog', { name: 'Add expense' })`,

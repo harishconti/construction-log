@@ -30,3 +30,9 @@ prisma/*.db-journal
 /test-results/
 /playwright-report/
 /e2e/.auth/
+
+# npm is the package manager (see "packageManager" in package.json); never commit other lockfiles
+pnpm-lock.yaml
+yarn.lock
+bun.lock
+bun.lockb

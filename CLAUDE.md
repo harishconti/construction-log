@@ -9,6 +9,7 @@ Design docs live in `docs/` (index: `docs/README.md`). **What is actually built*
 `docs/09-IMPLEMENTATION-STATUS.md` — trust it over 00–07, which describe the target design.
 
 ## Commands
+**npm only** (`packageManager` in package.json; CI runs `npm ci`). Don't commit pnpm/yarn/bun lockfiles.
 ```bash
 npm run dev          # next dev (needs .env — see .env.example)
 npm run lint         # eslint .
