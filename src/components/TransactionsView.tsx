@@ -129,19 +129,18 @@ function TransactionForm({
   const selectedCategoryId = categoryId || categories[0]?.id || '';
 
   async function uploadPhoto(f: File): Promise<string> {
-    const presign = await api.post<{ uploadUrl: string; fileKey: string }>('/api/uploads/presign', {
-      projectId,
-      parentType: 'transaction',
-      mimeType: f.type,
-      size: f.size,
-    });
+    const presign = await api.post<{ uploadUrl: string; fileKey: string; attachmentId: string }>(
+      '/api/uploads/presign',
+      { projectId, parentType: 'transaction', mimeType: f.type, size: f.size },
+    );
     const put = await fetch(presign.uploadUrl, {
       method: 'PUT',
       body: f,
       headers: { 'Content-Type': f.type },
     });
     if (!put.ok) throw new Error('Photo upload failed');
-    return presign.fileKey;
+    await api.post(`/api/uploads/${presign.attachmentId}/finalize`, {});
+    return presign.attachmentId;
   }
 
   async function submit(e: React.FormEvent) {
@@ -149,26 +148,30 @@ function TransactionForm({
     setError(null);
     setPending(true);
     try {
-      const fileKeys: string[] = [];
+      const attachmentIds: string[] = [];
       if (file && file.type.startsWith('image/')) {
         try {
-          fileKeys.push(await uploadPhoto(file));
+          attachmentIds.push(await uploadPhoto(file));
         } catch (uploadErr) {
           setError(uploadErr instanceof Error ? uploadErr.message : 'Photo upload failed');
           return;
         }
       }
 
-      await api.post(`/api/projects/${projectId}/transactions`, {
-        categoryId: selectedCategoryId,
-        occurredAt: new Date(occurredAt).toISOString(),
-        amount: Number(amount),
-        gstAmount: Number(gstAmount || 0),
-        vendor: vendor || null,
-        paymentMode,
-        description: description || null,
-        fileKeys,
-      });
+      await api.post(
+        `/api/projects/${projectId}/transactions`,
+        {
+          categoryId: selectedCategoryId,
+          occurredAt: new Date(occurredAt).toISOString(),
+          amount: Number(amount),
+          gstAmount: Number(gstAmount || 0),
+          vendor: vendor || null,
+          paymentMode,
+          description: description || null,
+          attachmentIds,
+        },
+        { 'Idempotency-Key': crypto.randomUUID() },
+      );
       onCreated();
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Failed to save');

@@ -2,6 +2,7 @@ import { describe, expect, it } from 'vitest';
 import {
   addMemberSchema,
   createTransactionSchema,
+  finalizeAttachmentSchema,
   presignSchema,
   registerSchema,
   updateTransactionSchema,
@@ -76,5 +77,39 @@ describe('addMemberSchema', () => {
   it('requires a valid role', () => {
     expect(addMemberSchema.safeParse({ email: 'x@y.com', role: 'owner' }).success).toBe(false);
     expect(addMemberSchema.safeParse({ email: 'x@y.com', role: 'viewer' }).success).toBe(true);
+  });
+});
+
+describe('transaction attachments & version', () => {
+  const base = {
+    categoryId: 'cat_1',
+    occurredAt: new Date(Date.now() - 1000),
+    amount: 1000,
+    paymentMode: 'cash' as const,
+  };
+
+  it('accepts attachmentIds (up to 10)', () => {
+    expect(createTransactionSchema.safeParse({ ...base, attachmentIds: ['a1', 'a2'] }).success).toBe(true);
+    expect(
+      createTransactionSchema.safeParse({ ...base, attachmentIds: Array.from({ length: 11 }, (_, i) => `a${i}`) })
+        .success,
+    ).toBe(false);
+  });
+
+  it('accepts an optimistic-lock version on update', () => {
+    expect(updateTransactionSchema.safeParse({ amount: 10, version: 3 }).success).toBe(true);
+    expect(updateTransactionSchema.safeParse({ version: -1 }).success).toBe(false);
+  });
+});
+
+describe('finalizeAttachmentSchema', () => {
+  it('allows no parent, or exactly one parent', () => {
+    expect(finalizeAttachmentSchema.safeParse({}).success).toBe(true);
+    expect(finalizeAttachmentSchema.safeParse({ transactionId: 't1' }).success).toBe(true);
+    expect(finalizeAttachmentSchema.safeParse({ diaryEntryId: 'd1' }).success).toBe(true);
+  });
+
+  it('rejects two parents', () => {
+    expect(finalizeAttachmentSchema.safeParse({ transactionId: 't1', diaryEntryId: 'd1' }).success).toBe(false);
   });
 });

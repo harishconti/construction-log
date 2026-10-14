@@ -48,7 +48,7 @@ is registered at Hostinger; nameservers point to Cloudflare.
 
 ## Request Flow Examples
 
-### Add Transaction with Photo (direct-to-R2, with finalize) _(finalize step: to implement)_
+### Add Transaction with Photo (direct-to-R2, with finalize)
 1. User fills the form on their phone and selects a bill photo.
 2. Client calls `POST /api/uploads/presign` with `{projectId, parentType, mimeType, size}`.
 3. Server validates session + project membership + role (editor/admin), enforces the MIME/size
@@ -68,8 +68,8 @@ is registered at Hostinger; nameservers point to Cloudflare.
 ## Data Consistency Guarantees
 - One Neon database; all users share it.
 - All writes go through Next.js route handlers with server-side validation — never direct DB access from the client.
-- Optimistic version checks (`version`/`updatedAt`) prevent silent concurrent overwrites _(to implement)_.
-- Idempotency keys make create/finalize safe to retry _(to implement)_.
+- Optimistic version checks (`version`/`updatedAt`) prevent silent concurrent overwrites.
+- Idempotency keys make create/finalize safe to retry.
 - Audit logs and budget revisions are written in the **same transaction** as the mutation (atomic).
 
 ## Failure / Recovery

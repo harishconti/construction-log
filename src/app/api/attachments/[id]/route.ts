@@ -22,11 +22,16 @@ export const DELETE = handle<Ctx>(async (_req, { params: paramsPromise }) => {
   await prisma.$transaction(async (tx) => {
     await tx.attachment.delete({ where: { id: attachment.id } });
     await writeAudit(tx, {
-      entity: 'transaction',
-      entityId: attachment.parentId,
+      entity: 'attachment',
+      entityId: attachment.id,
       action: 'delete',
       actorId: user.id,
-      before: { attachmentId: attachment.id, fileKey: attachment.fileKey },
+      before: {
+        attachmentId: attachment.id,
+        fileKey: attachment.fileKey,
+        transactionId: attachment.transactionId,
+        diaryEntryId: attachment.diaryEntryId,
+      },
     });
   });
 

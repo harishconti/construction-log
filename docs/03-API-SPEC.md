@@ -99,3 +99,11 @@ member of project A cannot read or write project B.
 ## Error Shape
 All errors return `{ error: string, code: string }` with an appropriate HTTP status
 (400/401/403/404/409/422/500).
+
+## Implementation Status
+Implemented: Neon Auth proxy; projects/members/categories/transactions; two-phase R2 upload
+(presign → PUT → finalize) with link-on-create; attachment delete; editor-any transaction edits;
+soft-delete/restore; optimistic locking (`version`) and `Idempotency-Key` on transaction create.
+
+Pending: diary endpoints, budgets/revisions, timeline/dashboard; scheduled orphan-cleanup; Neon Auth
+trusted-origin configuration; production `prisma migrate deploy` release process.

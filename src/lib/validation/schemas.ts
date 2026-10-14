@@ -40,6 +40,7 @@ export const updateProjectSchema = z.object({
   description: z.string().trim().max(2000).optional().nullable(),
   startDate: z.coerce.date().optional(),
   status: projectStatusSchema.optional(),
+  version: z.number().int().min(0).optional(),
 });
 
 export const addMemberSchema = z.object({
@@ -79,7 +80,7 @@ export const createTransactionSchema = z
     vendor: z.string().trim().max(200).optional().nullable(),
     paymentMode: paymentModeSchema,
     description: z.string().trim().max(2000).optional().nullable(),
-    fileKeys: z.array(z.string().min(1)).max(10).optional(),
+    attachmentIds: z.array(z.string().min(1)).max(10).optional(),
   })
   .superRefine((val, ctx) => {
     if (val.gstAmount > val.amount) {
@@ -107,6 +108,7 @@ export const updateTransactionSchema = z
     vendor: z.string().trim().max(200).optional().nullable(),
     paymentMode: paymentModeSchema.optional(),
     description: z.string().trim().max(2000).optional().nullable(),
+    version: z.number().int().min(0).optional(),
   })
   .superRefine((val, ctx) => {
     if (val.amount !== undefined && val.gstAmount !== undefined && val.gstAmount > val.amount) {
@@ -136,6 +138,16 @@ export const presignSchema = z.object({
   size: z.number().int().positive().max(15 * 1024 * 1024).optional(),
 });
 
+/** Optional: attach a finalized upload directly to an existing record. */
+export const finalizeAttachmentSchema = z
+  .object({
+    transactionId: z.string().min(1).optional(),
+    diaryEntryId: z.string().min(1).optional(),
+  })
+  .refine((v) => !(v.transactionId && v.diaryEntryId), {
+    message: 'An attachment can have at most one parent',
+  });
+
 export type RegisterInput = z.infer<typeof registerSchema>;
 export type LoginInput = z.infer<typeof loginSchema>;
 export type CreateProjectInput = z.infer<typeof createProjectSchema>;
@@ -146,3 +158,4 @@ export type UpdateCategoryInput = z.infer<typeof updateCategorySchema>;
 export type CreateTransactionInput = z.infer<typeof createTransactionSchema>;
 export type UpdateTransactionInput = z.infer<typeof updateTransactionSchema>;
 export type PresignInput = z.infer<typeof presignSchema>;
+export type FinalizeAttachmentInput = z.infer<typeof finalizeAttachmentSchema>;

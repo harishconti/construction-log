@@ -6,9 +6,10 @@ export type AuditEntity =
   | 'budget'
   | 'project'
   | 'member'
-  | 'category';
+  | 'category'
+  | 'attachment';
 
-export type AuditAction = 'create' | 'update' | 'delete' | 'restore' | 'role_change';
+export type AuditAction = 'create' | 'update' | 'delete' | 'restore' | 'role_change' | 'finalize';
 
 export type AuditEntry = {
   entity: AuditEntity;

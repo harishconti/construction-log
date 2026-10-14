@@ -1,11 +1,12 @@
 // prisma/schema.prisma
 //
-// Construction Ledger data model.
+// Construction Ledger data model (target design — see docs/02-DATA-MODEL.md).
 // Design notes:
+//  - Auth identity is Neon Auth; User.id mirrors the Neon Auth user id. No passwords stored.
 //  - Actual budget spend is NEVER stored; it is derived from Transaction rows.
-//  - Attachments carry a projectId so every file is scoped to its project at the
-//    DB level (in addition to the generic parentType/parentId link).
-//  - Budget revisions are append-only history.
+//  - Attachments are private and server-keyed; attached rows reference exactly one parent
+//    (transaction XOR diary_entry), enforced by a CHECK constraint in a migration.
+//  - `version` columns provide optimistic locking. `IdempotencyKey` makes create/finalize retry-safe.
 
 generator client {
   provider = "prisma-client-js"
@@ -18,11 +19,10 @@ datasource db {
 }
 
 model User {
-  id           String   @id // Neon Auth user id (UUID) — mirrored locally for FK integrity
-  name         String
-  email        String   @unique
-  passwordHash String? // legacy field; credentials are managed by Neon Auth
-  createdAt    DateTime @default(now())
+  id        String   @id // Neon Auth user id (mirrored locally for FK integrity)
+  name      String
+  email     String   @unique
+  createdAt DateTime @default(now())
 
   memberships    ProjectMember[]
   transactions   Transaction[]
@@ -30,7 +30,7 @@ model User {
   auditLogs      AuditLog[]
   budgetsCreated Budget[]
   uploads        Attachment[]
-  projectsOwned  Project[]       @relation("ProjectCreator")
+  projectsOwned  Project[]        @relation("ProjectCreator")
 }
 
 model Project {
@@ -39,6 +39,7 @@ model Project {
   description String?
   startDate   DateTime
   status      String   @default("active") // active | paused | completed
+  version     Int      @default(0)
   createdBy   String
   createdAt   DateTime @default(now())
 
@@ -84,19 +85,21 @@ model Transaction {
   projectId   String
   categoryId  String
   occurredAt  DateTime
-  amount      Decimal   @db.Decimal(12, 2)
-  gstAmount   Decimal   @default(0) @db.Decimal(12, 2)
+  amount      Decimal   @db.Decimal(12, 2) // GST-inclusive total
+  gstAmount   Decimal   @default(0) @db.Decimal(12, 2) // tax component already inside `amount`
   vendor      String?
   paymentMode String // 'cash' | 'upi' | 'bank' | 'card' | 'credit'
   description String?
+  version     Int       @default(0)
   createdBy   String
   createdAt   DateTime  @default(now())
   updatedAt   DateTime  @updatedAt
   deletedAt   DateTime? // soft delete
 
-  project       Project  @relation(fields: [projectId], references: [id], onDelete: Cascade)
-  category      Category @relation(fields: [categoryId], references: [id])
-  createdByUser User     @relation(fields: [createdBy], references: [id])
+  project       Project      @relation(fields: [projectId], references: [id], onDelete: Cascade)
+  category      Category     @relation(fields: [categoryId], references: [id])
+  createdByUser User         @relation(fields: [createdBy], references: [id])
+  attachments   Attachment[]
 
   @@index([projectId, occurredAt])
   @@index([projectId, categoryId])
@@ -109,33 +112,41 @@ model DiaryEntry {
   entryDate DateTime
   title     String
   body      String   @db.Text
+  version   Int      @default(0)
   createdBy String
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
 
-  project       Project @relation(fields: [projectId], references: [id], onDelete: Cascade)
-  createdByUser User    @relation(fields: [createdBy], references: [id])
+  project       Project      @relation(fields: [projectId], references: [id], onDelete: Cascade)
+  createdByUser User         @relation(fields: [createdBy], references: [id])
+  attachments   Attachment[]
 
   @@index([projectId, entryDate])
   @@index([createdBy])
 }
 
 model Attachment {
-  id         String   @id @default(cuid())
-  projectId  String
-  parentType String // 'transaction' | 'diary_entry'
-  parentId   String
-  fileKey    String // R2 object key
-  fileUrl    String // public or presigned URL
-  mimeType   String
-  uploadedBy String
-  uploadedAt DateTime @default(now())
+  id            String   @id @default(cuid())
+  projectId     String
+  transactionId String?
+  diaryEntryId  String?
+  status        String   @default("pending") // 'pending' | 'ready'
+  fileKey       String // server-generated R2 object key; clients never supply this
+  mimeType      String
+  size          Int? // bytes, verified at finalize
+  checksum      String? // optional content hash
+  uploadedBy    String
+  uploadedAt    DateTime @default(now())
 
-  project  Project @relation(fields: [projectId], references: [id], onDelete: Cascade)
-  uploader User    @relation(fields: [uploadedBy], references: [id])
+  project     Project      @relation(fields: [projectId], references: [id], onDelete: Cascade)
+  transaction Transaction? @relation(fields: [transactionId], references: [id], onDelete: Cascade)
+  diaryEntry  DiaryEntry?  @relation(fields: [diaryEntryId], references: [id], onDelete: Cascade)
+  uploader    User         @relation(fields: [uploadedBy], references: [id])
 
-  @@index([parentType, parentId])
   @@index([projectId])
+  @@index([transactionId])
+  @@index([diaryEntryId])
+  @@index([status])
 }
 
 model Budget {
@@ -143,9 +154,10 @@ model Budget {
   projectId     String
   categoryId    String
   periodType    String // 'week' | 'month'
-  periodStart   DateTime // Monday for week, 1st for month
+  periodStart   DateTime // Monday for week, 1st for month (Asia/Kolkata boundary)
   plannedAmount Decimal  @db.Decimal(12, 2)
   note          String?
+  version       Int      @default(0)
   createdBy     String
   createdAt     DateTime @default(now())
   updatedAt     DateTime @updatedAt
@@ -165,7 +177,7 @@ model BudgetRevision {
   oldAmount Decimal  @db.Decimal(12, 2)
   newAmount Decimal  @db.Decimal(12, 2)
   reason    String?
-  changedBy String
+  changedBy String // plain column; no FK relation
   changedAt DateTime @default(now())
 
   budget Budget @relation(fields: [budgetId], references: [id], onDelete: Cascade)
@@ -175,9 +187,9 @@ model BudgetRevision {
 
 model AuditLog {
   id        String   @id @default(cuid())
-  entity    String // 'transaction' | 'diary_entry' | 'budget' | 'project' | 'member' | 'category'
+  entity    String // 'transaction' | 'diary_entry' | 'budget' | 'project' | 'member' | 'category' | 'attachment'
   entityId  String
-  action    String // 'create' | 'update' | 'delete' | 'restore' | 'role_change'
+  action    String // 'create' | 'update' | 'delete' | 'restore' | 'role_change' | 'finalize'
   actorId   String
   before    Json?
   after     Json?
@@ -187,4 +199,17 @@ model AuditLog {
 
   @@index([entity, entityId])
   @@index([actorId, createdAt])
+}
+
+model IdempotencyKey {
+  id          String   @id @default(cuid())
+  projectId   String
+  userId      String
+  key         String
+  requestHash String
+  response    Json?
+  createdAt   DateTime @default(now())
+
+  @@unique([projectId, userId, key])
+  @@index([createdAt])
 }

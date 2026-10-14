@@ -1,5 +1,11 @@
 import { randomUUID } from 'node:crypto';
-import { DeleteObjectCommand, GetObjectCommand, PutObjectCommand, S3Client } from '@aws-sdk/client-s3';
+import {
+  DeleteObjectCommand,
+  GetObjectCommand,
+  HeadObjectCommand,
+  PutObjectCommand,
+  S3Client,
+} from '@aws-sdk/client-s3';
 import { getSignedUrl } from '@aws-sdk/s3-request-presigner';
 
 const EXT_BY_MIME: Record<string, string> = {
@@ -20,7 +26,6 @@ function config() {
     secretAccessKey: process.env.R2_SECRET_ACCESS_KEY,
     bucket: process.env.R2_BUCKET,
     endpoint,
-    publicUrl: process.env.R2_PUBLIC_URL?.replace(/\/$/, ''),
   };
 }
 
@@ -38,7 +43,7 @@ function s3(): S3Client {
   if (!client) {
     const c = config();
     client = new S3Client({
-      region: 'auto',
+      region: process.env.R2_REGION ?? 'auto',
       endpoint: c.endpoint,
       credentials: {
         accessKeyId: c.accessKeyId as string,
@@ -63,19 +68,23 @@ export async function presignPutUrl(key: string, mimeType: string): Promise<stri
   );
 }
 
-/** Returns a durable public URL if configured, otherwise a short-lived signed GET URL. */
+/** Short-lived signed GET URL. Buckets are private; there is no public URL. */
 export async function getReadUrl(fileKey: string): Promise<string> {
   const c = config();
-  if (c.publicUrl) return `${c.publicUrl}/${fileKey}`;
   return getSignedUrl(s3(), new GetObjectCommand({ Bucket: c.bucket, Key: fileKey }), {
     expiresIn: 3600,
   });
 }
 
-/** Durable public URL for a key when a public bucket is configured, else ''. */
-export function publicUrlForKey(fileKey: string): string {
+/** Returns the stored object's size in bytes, or null if the object does not exist. */
+export async function headObjectSize(fileKey: string): Promise<number | null> {
   const c = config();
-  return c.publicUrl ? `${c.publicUrl}/${fileKey}` : '';
+  try {
+    const res = await s3().send(new HeadObjectCommand({ Bucket: c.bucket, Key: fileKey }));
+    return typeof res.ContentLength === 'number' ? res.ContentLength : null;
+  } catch {
+    return null;
+  }
 }
 
 export async function deleteObject(fileKey: string): Promise<void> {

@@ -230,3 +230,13 @@ model IdempotencyKey {
 - Prisma relations must validate before migration; polymorphic relations are replaced by explicit
   nullable FKs so the schema compiles.
 - Keep application migrations out of the provider-managed `neon_auth` schema.
+
+## Implementation Status
+Implemented (migrations under `prisma/migrations`): `User.id` = Neon Auth id with no `passwordHash`;
+`version` columns on Project/Transaction/DiaryEntry/Budget; `Attachment` with `transactionId`/
+`diaryEntryId`/`status`/`size`; the `attachment_parent_check` and `attachment_status_check` CHECK
+constraints; `IdempotencyKey` with a stored `response`. Prisma uses pooled `DATABASE_URL` + direct
+`DIRECT_URL`.
+
+Pending: `checksum` column population; scheduled orphan-`pending` reclamation and R2 deletion retries;
+diary/budget endpoints that consume these models.
