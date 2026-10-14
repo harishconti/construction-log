@@ -1,7 +1,15 @@
 'use client';
 
-import { useCallback, useEffect, useState } from 'react';
+import { useCallback, useEffect, useMemo, useState } from 'react';
+import Link from 'next/link';
+import { BookOpen, Receipt } from 'lucide-react';
 import { api } from '@/lib/api-client';
+import { formatDayLabel, formatINR } from '@/lib/format';
+import { Alert } from '@/components/ui/Alert';
+import { Button } from '@/components/ui/Button';
+import { EmptyState } from '@/components/ui/EmptyState';
+import { SkeletonRows } from '@/components/ui/Skeleton';
+import { DateInput, Field } from '@/components/ui/inputs';
 
 type Item =
   | {
@@ -17,6 +25,19 @@ type Item =
   | { type: 'diary'; id: string; date: string; title: string; body: string };
 
 type TimelineResponse = { items: Item[]; nextCursor: string | null; hasMore: boolean };
+
+const PAYMENT_LABEL: Record<string, string> = {
+  cash: 'Cash',
+  upi: 'UPI',
+  bank: 'Bank transfer',
+  card: 'Card',
+  credit: 'Credit',
+};
+
+/** IST calendar day, used to group items. */
+function dayKey(iso: string): string {
+  return new Intl.DateTimeFormat('en-CA', { timeZone: 'Asia/Kolkata' }).format(new Date(iso));
+}
 
 export function TimelineView({ projectId }: { projectId: string }) {
   const [items, setItems] = useState<Item[]>([]);
@@ -58,6 +79,21 @@ export function TimelineView({ projectId }: { projectId: string }) {
     void loadFirst();
   }, [loadFirst]);
 
+  const groups = useMemo(() => {
+    const out: { key: string; label: string; spend: number; items: Item[] }[] = [];
+    for (const it of items) {
+      const key = dayKey(it.date);
+      let g = out.find((x) => x.key === key);
+      if (!g) {
+        g = { key, label: formatDayLabel(it.date), spend: 0, items: [] };
+        out.push(g);
+      }
+      g.items.push(it);
+      if (it.type === 'transaction') g.spend += Number(it.amount);
+    }
+    return out;
+  }, [items]);
+
   async function loadMore() {
     if (!nextCursor) return;
     setLoading(true);
@@ -74,91 +110,96 @@ export function TimelineView({ projectId }: { projectId: string }) {
     }
   }
 
+  const base = `/projects/${projectId}`;
+
   return (
     <div className="space-y-4">
-      <h1 className="text-lg font-semibold">Timeline</h1>
+      <h1 className="font-display text-2xl font-bold lg:text-[28px]">Timeline</h1>
 
-      <div className="flex flex-wrap items-end gap-2">
-        <label className="text-sm">
-          <span className="block text-slate-700">From</span>
-          <input
-            type="date"
-            value={from}
-            onChange={(e) => setFrom(e.target.value)}
-            className="mt-1 rounded-lg border border-slate-300 px-3 py-1.5 text-sm"
-          />
-        </label>
-        <label className="text-sm">
-          <span className="block text-slate-700">To</span>
-          <input
-            type="date"
-            value={to}
-            onChange={(e) => setTo(e.target.value)}
-            className="mt-1 rounded-lg border border-slate-300 px-3 py-1.5 text-sm"
-          />
-        </label>
+      <div className="flex flex-wrap items-end gap-3">
+        <div className="w-[calc(50%-6px)] sm:w-44">
+          <Field label="From">
+            <DateInput value={from} max={to || undefined} onChange={(e) => setFrom(e.target.value)} />
+          </Field>
+        </div>
+        <div className="w-[calc(50%-6px)] sm:w-44">
+          <Field label="To">
+            <DateInput value={to} min={from || undefined} onChange={(e) => setTo(e.target.value)} />
+          </Field>
+        </div>
         {(from || to) && (
-          <button
-            type="button"
+          <Button
+            variant="ghost"
             onClick={() => {
               setFrom('');
               setTo('');
             }}
-            className="rounded-lg px-3 py-1.5 text-sm text-slate-600 hover:bg-slate-100"
           >
-            Clear
-          </button>
+            Clear dates
+          </Button>
         )}
       </div>
 
-      {error && <p className="text-sm text-red-600">{error}</p>}
+      {error && <Alert message={error} onRetry={items.length ? loadMore : loadFirst} />}
+
       {loading && items.length === 0 ? (
-        <p className="text-sm text-slate-500">Loading…</p>
+        <SkeletonRows leading trailing label="Loading timeline" />
       ) : items.length === 0 ? (
-        <div className="rounded-xl border border-dashed border-slate-300 bg-white p-8 text-center text-sm text-slate-500">
-          Nothing here yet.
-        </div>
+        <EmptyState title={from || to ? 'Nothing in this date range.' : 'Nothing here yet — expenses and diary entries will show up here.'} />
       ) : (
-        <ol className="space-y-2">
-          {items.map((it) => (
-            <li key={`${it.type}-${it.id}`} className="flex gap-3 rounded-xl bg-white p-3 shadow-sm">
-              <div className="w-20 shrink-0 text-xs text-slate-500">
-                {new Date(it.date).toLocaleDateString()}
-              </div>
-              <div className="flex-1 text-sm">
-                {it.type === 'transaction' ? (
-                  <div className="flex items-center justify-between gap-2">
-                    <div>
-                      <div className="font-medium">{it.category.name}</div>
-                      <div className="text-slate-500">
-                        {[it.vendor, it.paymentMode].filter(Boolean).join(' · ')}
-                      </div>
-                      {it.description && <div className="text-slate-500">{it.description}</div>}
-                    </div>
-                    <div className="font-medium">₹{Number(it.amount).toLocaleString('en-IN')}</div>
-                  </div>
-                ) : (
-                  <div>
-                    <div className="font-medium">{it.title}</div>
-                    {it.body && <div className="whitespace-pre-wrap text-slate-600">{it.body}</div>}
-                  </div>
-                )}
-              </div>
-            </li>
+        <div className="space-y-4">
+          {groups.map((g) => (
+            <section key={g.key} aria-labelledby={`tl-${g.key}`}>
+              <header className="flex items-center justify-between px-1 py-1.5 text-xs text-ink-2">
+                <h2 id={`tl-${g.key}`} className="font-semibold">
+                  {g.label}
+                </h2>
+                {g.spend > 0 && <span className="num">{formatINR(g.spend)}</span>}
+              </header>
+              <ol className="divide-y divide-border overflow-hidden rounded-lg border border-border bg-surface">
+                {g.items.map((it) => (
+                  <li key={`${it.type}-${it.id}`}>
+                    {it.type === 'transaction' ? (
+                      <Link href={`${base}/transactions#tx-${it.id}`} className="flex items-center gap-3 p-3 text-sm hover:bg-surface-2">
+                        <span className="flex h-11 w-11 shrink-0 items-center justify-center rounded-sm bg-primary-tint text-primary">
+                          <Receipt size={20} aria-hidden />
+                          <span className="sr-only">Expense</span>
+                        </span>
+                        <span className="min-w-0 flex-1">
+                          <span className="block truncate font-medium">{it.vendor || it.category.name}</span>
+                          <span className="block truncate text-ink-2">
+                            {[it.vendor ? it.category.name : null, PAYMENT_LABEL[it.paymentMode] ?? it.paymentMode, it.description]
+                              .filter(Boolean)
+                              .join(' · ')}
+                          </span>
+                        </span>
+                        <span className="num shrink-0 text-right font-semibold">{formatINR(it.amount)}</span>
+                      </Link>
+                    ) : (
+                      <Link href={`${base}/diary#entry-${it.id}`} className="flex items-start gap-3 p-3 text-sm hover:bg-surface-2">
+                        <span className="flex h-11 w-11 shrink-0 items-center justify-center rounded-sm bg-warn-tint text-warn">
+                          <BookOpen size={20} aria-hidden />
+                          <span className="sr-only">Diary entry</span>
+                        </span>
+                        <span className="min-w-0 flex-1">
+                          <span className="block truncate font-medium">{it.title}</span>
+                          {it.body && <span className="line-clamp-2 block whitespace-pre-wrap text-ink-2">{it.body}</span>}
+                        </span>
+                      </Link>
+                    )}
+                  </li>
+                ))}
+              </ol>
+            </section>
           ))}
-        </ol>
+        </div>
       )}
 
       {hasMore && (
         <div className="flex justify-center">
-          <button
-            type="button"
-            onClick={loadMore}
-            disabled={loading}
-            className="rounded-lg border border-slate-300 px-4 py-2 text-sm text-slate-700 hover:bg-slate-50 disabled:opacity-60"
-          >
-            {loading ? 'Loading…' : 'Load more'}
-          </button>
+          <Button variant="secondary" onClick={loadMore} loading={loading && items.length > 0}>
+            Load more
+          </Button>
         </div>
       )}
     </div>
