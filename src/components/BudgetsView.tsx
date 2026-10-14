@@ -134,7 +134,7 @@ export function BudgetsView({ projectId, canEdit }: { projectId: string; canEdit
                 </p>
                 {r.planned > 0 && (
                   <div className="mt-2">
-                    <ProgressBar percent={r.percentUsed ?? 0} status={r.status ?? 'green'} />
+                    <ProgressBar percent={r.percentUsed ?? 0} status={r.status ?? 'green'} label={`${r.name} budget used`} />
                   </div>
                 )}
                 {canEdit && (
@@ -175,7 +175,7 @@ export function BudgetsView({ projectId, canEdit }: { projectId: string; canEdit
                         {r.status && <StatusBadge status={r.status} />}
                         {r.planned > 0 && (
                           <div className="w-24">
-                            <ProgressBar percent={r.percentUsed ?? 0} status={r.status ?? 'green'} />
+                            <ProgressBar percent={r.percentUsed ?? 0} status={r.status ?? 'green'} label={`${r.name} budget used`} />
                           </div>
                         )}
                       </div>
@@ -185,7 +185,8 @@ export function BudgetsView({ projectId, canEdit }: { projectId: string; canEdit
                         <button
                           type="button"
                           onClick={() => setRevise({ open: true, row: r })}
-                          className="text-primary hover:underline"
+                          aria-label={`${r.budgetId ? 'Revise' : 'Set'} ${r.name} budget`}
+                          className="inline-flex min-h-11 items-center rounded-md px-2 text-primary hover:underline"
                         >
                           {r.budgetId ? 'Revise' : 'Set'}
                         </button>

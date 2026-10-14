@@ -186,8 +186,21 @@ export function SettingsView({ projectId, initialProject }: { projectId: string;
             <li key={c.id} className="flex items-center justify-between gap-2 py-2 text-sm">
               {renamingId === c.id ? (
                 <span className="flex flex-1 items-center gap-2">
-                  <TextInput value={renameValue} onChange={(e) => setRenameValue(e.target.value)} autoFocus />
-                  <Button type="button" onClick={() => saveRename(c)}>
+                  <TextInput
+                    value={renameValue}
+                    onChange={(e) => setRenameValue(e.target.value)}
+                    onKeyDown={(e) => {
+                      if (e.key === 'Enter') {
+                        e.preventDefault();
+                        void saveRename(c);
+                      } else if (e.key === 'Escape') {
+                        setRenamingId(null);
+                      }
+                    }}
+                    aria-label={`New name for ${c.name}`}
+                    autoFocus
+                  />
+                  <Button type="button" onClick={() => saveRename(c)} aria-label="Save name">
                     <Check size={16} aria-hidden />
                   </Button>
                 </span>
@@ -199,6 +212,7 @@ export function SettingsView({ projectId, initialProject }: { projectId: string;
               <span className="flex shrink-0 items-center gap-1">
                 <Button
                   variant="ghost"
+                  aria-label={`Rename ${c.name}`}
                   onClick={() => {
                     setRenamingId(c.id);
                     setRenameValue(c.name);
@@ -206,7 +220,7 @@ export function SettingsView({ projectId, initialProject }: { projectId: string;
                 >
                   <Pencil size={15} aria-hidden /> Rename
                 </Button>
-                <Button variant="ghost" onClick={() => toggleCategory(c)}>
+                <Button variant="ghost" aria-label={`Deactivate ${c.name}`} onClick={() => toggleCategory(c)}>
                   Deactivate
                 </Button>
               </span>
@@ -219,7 +233,8 @@ export function SettingsView({ projectId, initialProject }: { projectId: string;
             <button
               type="button"
               onClick={() => setShowInactive((v) => !v)}
-              className="text-sm text-ink-3 hover:text-ink"
+              aria-expanded={showInactive}
+              className="min-h-11 text-sm text-ink-3 hover:text-ink"
             >
               {showInactive ? 'Hide' : 'Show'} inactive ({inactive.length})
             </button>
@@ -230,7 +245,7 @@ export function SettingsView({ projectId, initialProject }: { projectId: string;
                     <span>
                       {c.name} <span className="text-xs">({TYPE_LABEL[c.type] ?? c.type})</span>
                     </span>
-                    <Button variant="ghost" onClick={() => toggleCategory(c)}>
+                    <Button variant="ghost" aria-label={`Activate ${c.name}`} onClick={() => toggleCategory(c)}>
                       Activate
                     </Button>
                   </li>

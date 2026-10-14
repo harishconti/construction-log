@@ -73,7 +73,7 @@ export default async function ProjectDashboard({ params }: { params: Promise<{ i
         {variance.percentUsed !== null && (
           <>
             <div className="mt-3">
-              <ProgressBar percent={variance.percentUsed} status={usedStatus} />
+              <ProgressBar percent={variance.percentUsed} status={usedStatus} label="Budget used this month" />
             </div>
             <p className="num mt-2 text-sm opacity-80">
               {formatINR(periodSpend)} of {formatINR(totalPlanned)} · {formatINR(Math.abs(variance.variance))}{' '}
@@ -125,7 +125,11 @@ export default async function ProjectDashboard({ params }: { params: Promise<{ i
                 </div>
                 {r.planned > 0 && (
                   <div className="mt-1">
-                    <ProgressBar percent={r.percentUsed ?? 0} status={(r.status ?? 'green') as BudgetStatus} />
+                    <ProgressBar
+                      percent={r.percentUsed ?? 0}
+                      status={(r.status ?? 'green') as BudgetStatus}
+                      label={`${r.name} budget used`}
+                    />
                   </div>
                 )}
               </li>
@@ -135,7 +139,7 @@ export default async function ProjectDashboard({ params }: { params: Promise<{ i
       )}
 
       <div className="grid gap-3 lg:grid-cols-2">
-        <section className="rounded-lg border border-border bg-surface p-4">
+        <section className="min-w-0 rounded-lg border border-border bg-surface p-4">
           <h2 className="font-display text-lg font-semibold">Recent expenses</h2>
           {recent.length === 0 ? (
             <div className="mt-3">
@@ -164,7 +168,7 @@ export default async function ProjectDashboard({ params }: { params: Promise<{ i
           )}
         </section>
 
-        <section className="rounded-lg border border-border bg-surface p-4">
+        <section className="min-w-0 rounded-lg border border-border bg-surface p-4">
           <h2 className="font-display text-lg font-semibold">Recent diary</h2>
           {recentDiary.length === 0 ? (
             <div className="mt-3">

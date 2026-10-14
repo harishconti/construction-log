@@ -1,4 +1,5 @@
 import { cache } from 'react';
+import { Prisma } from '@prisma/client';
 import { ApiError } from '@/lib/api';
 import { prisma } from '@/lib/prisma';
 import { writeAudit } from '@/lib/audit';
@@ -48,12 +49,25 @@ async function mirrorUser(u: NeonUser): Promise<AppUser> {
     return updated;
   }
 
-  const created = await prisma.user.create({
-    data: { id, email, name },
-    select: { id: true, name: true, email: true },
-  });
+  let created: AppUser;
+  try {
+    created = await prisma.user.create({
+      data: { id, email, name },
+      select: { id: true, name: true, email: true },
+    });
+  } catch (err) {
+    // A concurrent first request for this user won the insert (sign-up fires router.push + refresh).
+    if (!isUniqueViolation(err)) throw err;
+    const row = await prisma.user.findUnique({ where: { id }, select: { id: true, name: true, email: true } });
+    if (!row) throw err;
+    created = row;
+  }
   await claimInvitations(created);
   return created;
+}
+
+function isUniqueViolation(err: unknown): boolean {
+  return err instanceof Prisma.PrismaClientKnownRequestError && err.code === 'P2002';
 }
 
 /** Applies any non-expired pending email invitations once the account exists. Idempotent and cheap when empty. */
@@ -64,6 +78,18 @@ async function claimInvitations(user: { id: string; email: string }): Promise<vo
   });
   if (invitations.length === 0) return;
 
+  try {
+    await claimInTransaction(user, invitations);
+  } catch (err) {
+    // A concurrent request for the same user already claimed these invitations.
+    if (!isUniqueViolation(err)) throw err;
+  }
+}
+
+async function claimInTransaction(
+  user: { id: string; email: string },
+  invitations: { projectId: string; role: string }[],
+): Promise<void> {
   await prisma.$transaction(async (tx) => {
     for (const inv of invitations) {
       const existing = await tx.projectMember.findUnique({
