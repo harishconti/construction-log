@@ -103,10 +103,16 @@ bar with icons and safe-area padding, `max-w-[1200px]` content.
 them: sheet add/edit, mobile FAB, filter sheet + chips, day grouping with daily totals, overflow action
 menu, confirm dialogs and toasts. `window.confirm`/`prompt` are being phased out.
 
-**Batch A3 & B5–B6 — pending** (hardening: rate limiting, security headers, magic-byte sniff,
-backup/restore hardening, dependency upgrades, enum/CHECK constraints; design: dashboard/budgets rework
-and remaining polish across diary/dashboard/login/members + PWA PNG icons; migrate remaining screens to
-the primitives).
+**Batch A3 (partial) — done** (hardening & cleanups): security headers in `next.config.mjs`
+(CSP/HSTS/frame-ancestors/nosniff/referrer/permissions); `parsePeriodParam` validates month/day ranges;
+project detail `_count` excludes soft-deleted; project create writes an audit row and seeds default
+categories; removed dead `register`/`login` schemas and `next/image` remotePatterns; service-worker
+cache bumped and per-user shell pages no longer precached; backup script paginates prune, and restore
+uses a 0700 temp dir / 0600 file and **verifies the SHA-256**.
+
+**Batch A3 (rest) & B5–B6 — pending:** rate limiting; magic-byte sniffing; dependency upgrades
+(React 19 / Prisma 6 / vitest); enum/CHECK constraints; design dashboard/budgets rework and remaining
+polish (diary/dashboard/login/members onto the primitives) + PWA PNG icons.
 
 ## Not yet implemented (backlog)
 1. **Magic link**: UI is wired (`signIn.magicLink`), but the branch reports `magicLink.enabled: false`

@@ -11,6 +11,7 @@
 import fs from 'node:fs';
 import os from 'node:os';
 import path from 'node:path';
+import crypto from 'node:crypto';
 import { execFileSync } from 'node:child_process';
 import { S3Client, GetObjectCommand } from '@aws-sdk/client-s3';
 
@@ -87,6 +88,7 @@ function restoreCommand() {
 
 async function main() {
   let enc;
+  let expectedSha;
   if (FILE) {
     enc = fs.readFileSync(FILE);
   } else {
@@ -99,6 +101,7 @@ async function main() {
       new GetObjectCommand({ Bucket: process.env.BACKUP_BUCKET || process.env.R2_BUCKET, Key: KEY }),
     );
     enc = Buffer.from(await res.Body.transformToByteArray());
+    expectedSha = res.Metadata?.sha256;
   }
 
   const dump = execFileSync(
@@ -107,9 +110,18 @@ async function main() {
     { input: enc, maxBuffer: MAXBUF, env: process.env },
   );
 
-  const tmpDir = os.tmpdir();
-  const dumpFile = path.join(tmpDir, `clb-restore-${Date.now()}.dump`);
-  fs.writeFileSync(dumpFile, dump);
+  if (expectedSha) {
+    const actual = crypto.createHash('sha256').update(dump).digest('hex');
+    if (actual !== expectedSha) {
+      throw new Error(`Backup checksum mismatch (expected ${expectedSha}, got ${actual})`);
+    }
+    console.error('Checksum verified.');
+  }
+
+  // Private temp dir/file (0700/0600) — the dump is decrypted plaintext.
+  const tmpDir = fs.mkdtempSync(path.join(os.tmpdir(), 'clb-restore-'));
+  const dumpFile = path.join(tmpDir, 'backup.dump');
+  fs.writeFileSync(dumpFile, dump, { mode: 0o600 });
 
   try {
     const plan = restoreCommand();
@@ -131,7 +143,7 @@ async function main() {
     execFileSync(cmd, args, { maxBuffer: MAXBUF, stdio: ['ignore', 'inherit', 'inherit'] });
     console.error('Restore complete.');
   } finally {
-    fs.rmSync(dumpFile, { force: true });
+    fs.rmSync(tmpDir, { recursive: true, force: true });
   }
 }
 

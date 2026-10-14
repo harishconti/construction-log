@@ -121,6 +121,9 @@ Cleanest is to reconnect Neon without a prefix. Otherwise, in Vercel → Environ
 - Watch Neon compute/storage/transfer, R2 storage/operations, and Vercel function usage/quotas.
 - Expect Neon wake-up latency after idle; do not keep it awake with heartbeats.
 - Health endpoint (`GET /api/health`) exposes no secrets or private data.
+- **Security headers** (CSP, HSTS in production, `X-Frame-Options: DENY`, `X-Content-Type-Options: nosniff`,
+  `Referrer-Policy`, `Permissions-Policy`) are set in `next.config.mjs` `headers()`. The CSP allows
+  `connect-src`/`img-src` to the R2 S3 endpoint (browser uploads/downloads).
 
 ## 9. Rollback
 - Vercel: promote a previous deployment (instant). Database changes are forward-only — apply a new

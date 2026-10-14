@@ -17,21 +17,6 @@ const moneyPositive = z.number().gt(0).max(MAX_MONEY).refine(twoDecimals, 'At mo
 const moneyNonNegative = z.number().min(0).max(MAX_MONEY).refine(twoDecimals, 'At most 2 decimal places');
 
 // ---------------------------------------------------------------------------
-// Auth
-// ---------------------------------------------------------------------------
-
-export const registerSchema = z.object({
-  name: z.string().trim().min(1).max(120),
-  email: z.string().trim().toLowerCase().email().max(255),
-  password: z.string().min(8).max(200),
-});
-
-export const loginSchema = z.object({
-  email: z.string().trim().toLowerCase().email().max(255),
-  password: z.string().min(1).max(200),
-});
-
-// ---------------------------------------------------------------------------
 // Projects & members
 // ---------------------------------------------------------------------------
 
@@ -203,8 +188,6 @@ export const finalizeAttachmentSchema = z
     message: 'An attachment can have at most one parent',
   });
 
-export type RegisterInput = z.infer<typeof registerSchema>;
-export type LoginInput = z.infer<typeof loginSchema>;
 export type CreateProjectInput = z.infer<typeof createProjectSchema>;
 export type UpdateProjectInput = z.infer<typeof updateProjectSchema>;
 export type AddMemberInput = z.infer<typeof addMemberSchema>;

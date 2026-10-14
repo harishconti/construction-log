@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import { invitationExpiry, INVITATION_TTL_DAYS } from '../src/lib/invitations';
-import { todayIST } from '../src/lib/period';
+import { parsePeriodParam, todayIST } from '../src/lib/period';
 import { createTransactionSchema } from '../src/lib/validation/schemas';
 
 describe('todayIST', () => {
@@ -18,6 +18,21 @@ describe('invitationExpiry', () => {
     const exp = invitationExpiry(from);
     expect(exp.getTime() - from.getTime()).toBe(INVITATION_TTL_DAYS * 24 * 60 * 60 * 1000);
     expect(exp.getTime()).toBeGreaterThan(Date.now() - 1);
+  });
+});
+
+describe('parsePeriodParam ranges', () => {
+  it('rejects out-of-range months and days', () => {
+    expect(parsePeriodParam('month', '2026-13')).toBeNull();
+    expect(parsePeriodParam('month', '2026-00')).toBeNull();
+    expect(parsePeriodParam('week', '2026-02-31')).toBeNull();
+    expect(parsePeriodParam('week', '2026-04-31')).toBeNull();
+  });
+
+  it('accepts valid periods', () => {
+    expect(parsePeriodParam('month', '2026-10')).not.toBeNull();
+    expect(parsePeriodParam('week', '2026-10-14')).not.toBeNull();
+    expect(parsePeriodParam('week', '2026-02-28')).not.toBeNull();
   });
 });
 

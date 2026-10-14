@@ -4,20 +4,8 @@ import {
   createTransactionSchema,
   finalizeAttachmentSchema,
   presignSchema,
-  registerSchema,
   updateTransactionSchema,
 } from '../src/lib/validation/schemas';
-
-describe('registerSchema', () => {
-  it('accepts a valid signup and lowercases the email', () => {
-    const out = registerSchema.parse({ name: 'Ann', email: 'Ann@Example.com', password: 'password123' });
-    expect(out.email).toBe('ann@example.com');
-  });
-
-  it('rejects short passwords', () => {
-    expect(registerSchema.safeParse({ name: 'Ann', email: 'a@b.com', password: 'short' }).success).toBe(false);
-  });
-});
 
 describe('createTransactionSchema', () => {
   const base = {

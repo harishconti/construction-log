@@ -129,16 +129,24 @@ async function main() {
   );
   console.error(`Uploaded s3://${BUCKET}/${key} (${(enc.length / 1024 / 1024).toFixed(2)} MB) sha256=${sha}`);
 
-  // Prune old backups.
+  // Prune old backups (paginated; DeleteObjects in batches).
   const cutoff = Date.now() - RETENTION_DAYS * 86400000;
-  const listed = await s3.send(new ListObjectsV2Command({ Bucket: BUCKET, Prefix: 'backups/' }));
-  const old = (listed.Contents ?? []).filter((o) => o.LastModified && o.LastModified.getTime() < cutoff);
-  if (old.length) {
-    await s3.send(
-      new DeleteObjectsCommand({ Bucket: BUCKET, Delete: { Objects: old.map((o) => ({ Key: o.Key })) } }),
+  let token;
+  let pruned = 0;
+  do {
+    const listed = await s3.send(
+      new ListObjectsV2Command({ Bucket: BUCKET, Prefix: 'backups/', ContinuationToken: token }),
     );
-    console.error(`Pruned ${old.length} backup(s) older than ${RETENTION_DAYS} days.`);
-  }
+    const old = (listed.Contents ?? []).filter((o) => o.LastModified && o.LastModified.getTime() < cutoff);
+    if (old.length) {
+      await s3.send(
+        new DeleteObjectsCommand({ Bucket: BUCKET, Delete: { Objects: old.map((o) => ({ Key: o.Key })) } }),
+      );
+      pruned += old.length;
+    }
+    token = listed.IsTruncated ? listed.NextContinuationToken : undefined;
+  } while (token);
+  if (pruned) console.error(`Pruned ${pruned} backup(s) older than ${RETENTION_DAYS} days.`);
 }
 
 main().catch((e) => {

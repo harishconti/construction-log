@@ -21,7 +21,13 @@ export const GET = handle<Ctx>(async (_req, { params: paramsPromise }) => {
       status: true,
       startDate: true,
       createdAt: true,
-      _count: { select: { transactions: true, diaryEntries: true, members: true } },
+      _count: {
+        select: {
+          transactions: { where: { deletedAt: null } },
+          diaryEntries: true,
+          members: true,
+        },
+      },
     },
   });
 

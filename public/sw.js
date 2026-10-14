@@ -1,8 +1,9 @@
 // Construction Ledger service worker — app-shell cache only.
 // Private API responses are never cached.
 
-const CACHE = 'cl-shell-v1';
-const APP_SHELL = ['/', '/login', '/projects', '/manifest.json', '/icon.svg'];
+const CACHE = 'cl-shell-v2';
+// Note: authenticated pages (e.g. /projects) are NOT precached — they are per-user.
+const APP_SHELL = ['/login', '/manifest.json', '/icon.svg'];
 
 self.addEventListener('install', (event) => {
   event.waitUntil(
@@ -33,12 +34,10 @@ self.addEventListener('fetch', (event) => {
   // API and auth: network-only, never cached (private data).
   if (url.pathname.startsWith('/api/')) return;
 
-  // Navigations: network-first, fall back to cached shell.
+  // Navigations: network-first, fall back to the cached login shell.
   if (request.mode === 'navigate') {
     event.respondWith(
-      fetch(request).catch(() =>
-        caches.match(request).then((cached) => cached || caches.match('/projects') || caches.match('/')),
-      ),
+      fetch(request).catch(() => caches.match(request).then((cached) => cached || caches.match('/login'))),
     );
     return;
   }

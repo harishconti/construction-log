@@ -72,9 +72,18 @@ export function parsePeriodParam(g: Granularity, period: string): Date | null {
   if (g === 'month') {
     const m = /^(\d{4})-(\d{2})$/.exec(period);
     if (!m) return null;
-    return istMidnightUtc(Number(m[1]), Number(m[2]) - 1, 1);
+    const month = Number(m[2]);
+    if (month < 1 || month > 12) return null;
+    return istMidnightUtc(Number(m[1]), month - 1, 1);
   }
   const m = /^(\d{4})-(\d{2})-(\d{2})$/.exec(period);
   if (!m) return null;
-  return normalizePeriodStart('week', new Date(Date.UTC(Number(m[1]), Number(m[2]) - 1, Number(m[3]))));
+  const [y, mon, day] = [Number(m[1]), Number(m[2]), Number(m[3])];
+  if (mon < 1 || mon > 12 || day < 1 || day > 31) return null;
+  const utc = new Date(Date.UTC(y, mon - 1, day));
+  // Reject rollovers like 2026-02-31.
+  if (utc.getUTCFullYear() !== y || utc.getUTCMonth() !== mon - 1 || utc.getUTCDate() !== day) {
+    return null;
+  }
+  return normalizePeriodStart('week', utc);
 }
