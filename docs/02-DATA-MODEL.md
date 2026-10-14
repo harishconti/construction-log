@@ -55,6 +55,22 @@ model ProjectMember {
   @@index([userId])
 }
 
+/// Pending membership for an email that has not signed up yet. Claimed on first sign-in.
+model Invitation {
+  id        String   @id @default(cuid())
+  projectId String
+  email     String
+  role      String // 'admin' | 'editor' | 'viewer'
+  invitedBy String
+  createdAt DateTime @default(now())
+
+  project Project @relation(fields: [projectId], references: [id], onDelete: Cascade)
+  inviter User    @relation("InvitationInviter", fields: [invitedBy], references: [id])
+
+  @@unique([projectId, email])
+  @@index([email])
+}
+
 model Category {
   id        String  @id @default(cuid())
   projectId String
@@ -231,6 +247,8 @@ model ObjectDeletion {
   `diary_entry`, enforced by a DB `CHECK` (pending rows have neither).
 - **Two-phase upload** — `pending` row at presign, `ready` after the object is verified. A scheduled
   job reclaims orphaned `pending` rows and retries R2 deletions.
+- **Pending invitations** — an admin can invite an email before that person has an account; the
+  `Invitation` row is claimed automatically (creates a `ProjectMember`) on the invitee's first sign-in.
 - **Soft delete** on `Transaction` (`deletedAt`) — preserves history; admin can restore. Budget
   "actual" excludes soft-deleted rows; refunds/credits are modelled as negative or reversed rows
   (documented per project).
@@ -250,10 +268,11 @@ model ObjectDeletion {
 
 ## Implementation Status
 Implemented (migrations under `prisma/migrations`: `init`, `attachment_parent_check`,
-`idempotency_response`, `object_deletion_queue`, `attachment_original_name`): `User.id` = Neon Auth id
-with no `passwordHash`; `version` columns on Project/Transaction/DiaryEntry/Budget; `Attachment` with
-`transactionId`/`diaryEntryId`/`status`/`size`/`originalName`; the `attachment_parent_check` and
-`attachment_status_check` CHECK constraints; `IdempotencyKey` with a stored `response`;
-`ObjectDeletion` retry queue. Prisma uses pooled `DATABASE_URL` + direct `DIRECT_URL`.
+`idempotency_response`, `object_deletion_queue`, `attachment_original_name`, `invitations`): `User.id` =
+Neon Auth id with no `passwordHash`; `version` columns on Project/Transaction/DiaryEntry/Budget;
+`Attachment` with `transactionId`/`diaryEntryId`/`status`/`size`/`originalName`; the
+`attachment_parent_check` and `attachment_status_check` CHECK constraints; `IdempotencyKey` with a
+stored `response`; `ObjectDeletion` retry queue; `Invitation` (pre-signup invites). Prisma uses pooled
+`DATABASE_URL` + direct `DIRECT_URL`.
 
 Pending: `checksum` column population.

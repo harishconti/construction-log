@@ -25,13 +25,15 @@ member of project A cannot read or write project B.
 | GET | /api/projects/:id | Project detail | viewer |
 | PATCH | /api/projects/:id | Update project settings | admin |
 | GET | /api/projects/:id/members | List members | viewer |
-| POST | /api/projects/:id/members | Add member (email + role; user must already have an account) | admin |
+| GET | /api/projects/:id/members | List members **and pending invitations** | viewer |
+| POST | /api/projects/:id/members | Add member by email + role; if no account exists yet, stores a pending invitation claimed on sign-up | admin |
 | PATCH | /api/projects/:id/members/:userId | Change member role | admin |
 | DELETE | /api/projects/:id/members/:userId | Remove member | admin |
+| DELETE | /api/projects/:id/invitations/:invitationId | Cancel a pending invitation | admin |
 
-- New sign-ups receive **no automatic membership**. The initial admin is bootstrapped via seed/CLI
-  for a known Neon Auth user id — there is no public "first sign-up wins" route.
-- The **last admin** cannot be removed or demoted.
+- The project creator becomes its **admin**. New sign-ups receive **no automatic membership**; an admin
+  adds them by email (existing account → membership now; new email → pending invitation that applies on
+  first sign-in). The **last admin** cannot be removed or demoted.
 
 ## Categories
 | Method | Path | Description | Min Role |

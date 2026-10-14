@@ -29,7 +29,7 @@ Migrations: `init`, `attachment_parent_check`, `idempotency_response`, `object_d
 |---|---|
 | Auth | `ALL /api/auth/[...path]` (Neon Auth proxy) |
 | Projects | `GET/POST /api/projects`; `GET/PATCH /api/projects/:id` |
-| Members | `GET/POST /api/projects/:id/members`; `PATCH/DELETE /api/projects/:id/members/:userId` |
+| Members | `GET/POST /api/projects/:id/members`; `PATCH/DELETE /api/projects/:id/members/:userId`; `DELETE /api/projects/:id/invitations/:invitationId` |
 | Categories | `GET/POST /api/projects/:id/categories`; `PATCH /api/projects/:id/categories/:catId` |
 | Transactions | `GET/POST /api/projects/:id/transactions`; `PATCH/DELETE /api/projects/:id/transactions/:txId`; `POST …/restore` |
 | Diary | `GET/POST /api/projects/:id/diary`; `PATCH/DELETE /api/projects/:id/diary/:entryId` |
@@ -49,7 +49,7 @@ PWA: `manifest.json` + service worker (`public/sw.js`, registered in production)
 
 ## Behaviour implemented
 - **Auth**: Neon Auth sign-up/in via same-origin proxy; server `getSession`; user mirror upsert.
-- **Authorization**: `requireRole(projectId, userId, minRole)` on every route; project isolation via `projectId` scoping; last-admin safeguard; editor-any transaction edits (admin-only delete/restore); diary author/admin edits, admin delete.
+- **Authorization**: `requireRole(projectId, userId, minRole)` on every route; project isolation via `projectId` scoping; last-admin safeguard; editor-any transaction edits (admin-only delete/restore); diary author/admin edits, admin delete. The project creator is its first admin. Admins can invite by email before the invitee has an account (pending `Invitation` claimed automatically on first sign-in).
 - **Uploads**: presign → browser PUT direct to R2 → finalize (HeadObject verifies existence/size,
   re-checks the size cap) → link on create. Images render inline via signed GET; **all other types are
   download-only** through `GET /api/attachments/:id/download` (`octet-stream`, `attachment`, `nosniff`).
@@ -71,15 +71,14 @@ PWA: `manifest.json` + service worker (`public/sw.js`, registered in production)
 ## Not yet implemented (backlog)
 1. **Magic link**: UI is wired (`signIn.magicLink`), but the branch reports `magicLink.enabled: false`
    (`POST /api/auth/sign-in/magic-link` → 404). Enable it on the Neon Auth branch to activate.
-2. **Members invite UX**: invite requires the invitee to have signed up first; no email invite flow.
-3. **Neon Auth config**: add trusted origins (`https://build.harishspace.in`, preview), review sign-up controls.
-4. **R2 CORS**: allow `localhost:3000` (+ production origin) for PUT/GET/HEAD.
-5. **Release/backup tooling**: `npm run db:backup` / `db:restore` + `prisma:deploy` implemented (see
+2. **Neon Auth config**: add trusted origins (`https://build.harishspace.in`, preview), review sign-up controls.
+3. **R2 CORS**: allow `localhost:3000` (+ production origin) for PUT/GET/HEAD.
+4. **Release/backup tooling**: `npm run db:backup` / `db:restore` + `prisma:deploy` implemented (see
    `10-OPERATIONS.md`); still to do: schedule backups outside Vercel, provision a separate prod backup
    bucket/credentials, and a documented Neon Auth recovery step.
-6. **Dev/prod isolation**: local dev currently targets the default (production) Neon branch — create a
+5. **Dev/prod isolation**: local dev currently targets the default (production) Neon branch — create a
    `dev` branch (needs Neon CLI auth; procedure in `10-OPERATIONS.md`).
-7. **Optional hardening**: malware/AV scanning on finalize; magic-byte content sniffing to reject mismatched types (defence in depth).
+6. **Optional hardening**: malware/AV scanning on finalize; magic-byte content sniffing to reject mismatched types (defence in depth).
 
 ## Environment variables
 `DATABASE_URL`, `DIRECT_URL`, `NEON_AUTH_BASE_URL`, `NEON_AUTH_COOKIE_SECRET`, `NEXT_PUBLIC_APP_URL`

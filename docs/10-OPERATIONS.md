@@ -64,8 +64,9 @@ Verified 14 Oct 2026: backup uploaded; restore into a throwaway Neon database re
 Use this if the ledger grows beyond the initial admin:
 1. **Sign-up**: each person signs up via the login page (Neon Auth). To stop open registration, disable
    sign-up in **Neon Console → Auth → settings** once your accounts exist; then create accounts deliberately.
-2. **Add to a project**: Members screen → add by email. The account **must already exist** (no email-invite
-   flow yet); the invitee signs up first, then an admin adds them.
+2. **Add to a project**: the project creator is the first **admin**. Members screen → add by email + role.
+   If the person already has an account they're added immediately; otherwise a **pending invitation** is
+   stored and applied automatically on their first sign-in. Pending invitations can be cancelled.
 3. **Roles are per project** (admin/editor/viewer). New sign-ups get **no membership** automatically.
 4. **Origins**: add any new app origin to Neon Auth trusted origins **and** to the R2 bucket CORS
    (`PUT, GET, HEAD`, `Content-Type`).

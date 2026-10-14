@@ -1,5 +1,6 @@
 import { ApiError } from '@/lib/api';
 import { prisma } from '@/lib/prisma';
+import { writeAudit } from '@/lib/audit';
 import { auth } from './server';
 
 export type AppUser = {
@@ -26,11 +27,42 @@ function normalise(u: NeonUser): { id: string; email: string; name: string } {
 
 async function mirrorUser(u: NeonUser): Promise<AppUser> {
   const { id, email, name } = normalise(u);
-  return prisma.user.upsert({
+  const user = await prisma.user.upsert({
     where: { id },
     update: { email, name },
     create: { id, email, name },
     select: { id: true, name: true, email: true },
+  });
+  await claimInvitations(user);
+  return user;
+}
+
+/** Applies any pending email invitations once the account exists. Idempotent and cheap when empty. */
+async function claimInvitations(user: { id: string; email: string }): Promise<void> {
+  const invitations = await prisma.invitation.findMany({
+    where: { email: user.email },
+    select: { projectId: true, role: true },
+  });
+  if (invitations.length === 0) return;
+
+  await prisma.$transaction(async (tx) => {
+    for (const inv of invitations) {
+      const existing = await tx.projectMember.findUnique({
+        where: { projectId_userId: { projectId: inv.projectId, userId: user.id } },
+      });
+      if (existing) continue;
+      await tx.projectMember.create({
+        data: { projectId: inv.projectId, userId: user.id, role: inv.role },
+      });
+      await writeAudit(tx, {
+        entity: 'member',
+        entityId: user.id,
+        action: 'create',
+        actorId: user.id,
+        after: { projectId: inv.projectId, userId: user.id, role: inv.role, via: 'invitation' },
+      });
+    }
+    await tx.invitation.deleteMany({ where: { email: user.email } });
   });
 }
 

@@ -31,6 +31,7 @@ model User {
   budgetsCreated Budget[]
   uploads        Attachment[]
   projectsOwned  Project[]        @relation("ProjectCreator")
+  invitationsSent Invitation[]    @relation("InvitationInviter")
 }
 
 model Project {
@@ -45,6 +46,7 @@ model Project {
 
   creator      User            @relation("ProjectCreator", fields: [createdBy], references: [id])
   members      ProjectMember[]
+  invitations  Invitation[]
   categories   Category[]
   transactions Transaction[]
   diaryEntries DiaryEntry[]
@@ -64,6 +66,22 @@ model ProjectMember {
 
   @@unique([projectId, userId])
   @@index([userId])
+}
+
+/// Pending membership for an email that has not signed up yet. Claimed automatically on first sign-in.
+model Invitation {
+  id        String   @id @default(cuid())
+  projectId String
+  email     String
+  role      String // 'admin' | 'editor' | 'viewer'
+  invitedBy String
+  createdAt DateTime @default(now())
+
+  project Project @relation(fields: [projectId], references: [id], onDelete: Cascade)
+  inviter User    @relation("InvitationInviter", fields: [invitedBy], references: [id])
+
+  @@unique([projectId, email])
+  @@index([email])
 }
 
 model Category {

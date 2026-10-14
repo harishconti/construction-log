@@ -44,6 +44,9 @@ viewer on another. Every check is server-side and re-reads membership from the d
 9. **Maintenance endpoints are not user-facing** — `/api/maintenance/*` is gated by a shared
    `MAINTENANCE_SECRET`/`CRON_SECRET` and is not part of the per-project role model. It denies with
    401 when no secret is configured and never returns project data to unauthenticated callers.
+10. **Invitations** — an admin may invite an email that has no account yet; the pending invitation is
+    claimed automatically on that person's first sign-in and the stored role is applied. The project
+    creator is its first admin. New sign-ups still receive no membership on their own.
 
 ## Acceptance Checks (must hold)
 - [ ] Viewer POST/PATCH/DELETE denied even via manual API calls.
