@@ -71,12 +71,15 @@ filters; consistent error shape `{ error, code }`).
 
 ## Deliverables
 1. Next.js project structure with all files.
-2. `prisma/schema.prisma` + seed (bootstrap admin by Neon Auth user id; sample categories/budgets).
-3. All API routes with validation + auth + audit logging.
+2. `prisma/schema.prisma` + `prisma/migrations/` + seed (bootstrap admin by Neon Auth user id; sample categories/budgets).
+3. All API routes with validation + auth + audit logging (incl. `/api/maintenance/cleanup`).
 4. All UI pages, responsive.
-5. `.env.example`, `README`, Vercel setup notes.
+5. `.env.example`, `README`, Vercel setup notes, `vercel.json` cron.
 6. PWA manifest + service worker.
 
-Start with Phase 1 (schema + Neon Auth wiring + transaction CRUD + audit log), confirm build/
-typecheck/tests pass, then Phase 2 (diary + budgets + dashboard), then Phase 3 (PWA + polish).
-Ask before assuming anything not specified here.
+Build order: Phase 1 (schema + Neon Auth wiring + transaction CRUD + audit log), Phase 2 (diary +
+budgets + dashboard), Phase 3 (PWA + polish), plus a secret-protected maintenance/cleanup job.
+
+> **Current status:** Phases 1–2 and the maintenance job are implemented (see `09-IMPLEMENTATION-STATUS.md`);
+> remaining work is the Members/Settings UI, the PWA service worker, and production hardening.
+> Ask before assuming anything not specified here.

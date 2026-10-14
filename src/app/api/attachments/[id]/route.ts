@@ -39,7 +39,15 @@ export const DELETE = handle<Ctx>(async (_req, { params: paramsPromise }) => {
     try {
       await deleteObject(attachment.fileKey);
     } catch (err) {
-      console.error('[attachments] failed to delete R2 object', err);
+      // Defer to the maintenance cleanup job rather than losing the object.
+      await prisma.objectDeletion.create({
+        data: {
+          projectId: attachment.projectId,
+          fileKey: attachment.fileKey,
+          lastError: String(err).slice(0, 500),
+        },
+      });
+      console.error('[attachments] R2 delete deferred', attachment.fileKey, err);
     }
   }
 

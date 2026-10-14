@@ -213,3 +213,16 @@ model IdempotencyKey {
   @@unique([projectId, userId, key])
   @@index([createdAt])
 }
+
+/// Retry queue for R2 object deletions that failed or were deferred.
+model ObjectDeletion {
+  id        String   @id @default(cuid())
+  projectId String?
+  fileKey   String
+  attempts  Int      @default(0)
+  lastError String?
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@index([createdAt])
+}

@@ -12,6 +12,9 @@
 | /projects/:id/members | Member management | admin |
 | /projects/:id/settings | Project settings + categories | admin |
 
+> **Status:** implemented pages are `/login`, `/projects`, project Dashboard, Transactions, Diary and
+> Budgets. The Members and Settings screens are not built yet (their APIs exist).
+
 ## Auth UI
 - Sign-in / sign-up is provided by **Neon Auth** (`@neondatabase/auth` client through the same-origin
   `/api/auth` proxy). No custom password forms or storage.
@@ -45,6 +48,7 @@
 - Custom service worker (no `next-pwa`): cache the app shell for faster loads; **API requests are
   network-first and never cached publicly** (private data). No offline write queue in v1.
 - Install prompt on mobile (A2HS).
+- **Status:** manifest implemented; the service worker + registration are pending (see `09-IMPLEMENTATION-STATUS.md`).
 
 ## Design Tokens
 - Primary color: `#2563eb` (blue) or user's choice.

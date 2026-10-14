@@ -85,6 +85,15 @@ member of project A cannot read or write project B.
 | GET | /api/projects/:id/timeline?from=&to= | Merged chronological feed of transactions + diary entries | viewer |
 | GET | /api/projects/:id/dashboard?period=month&date=YYYY-MM | Summary: total spend, by-category breakdown, budget variance | viewer |
 
+## Maintenance
+| Method | Path | Description | Access |
+|---|---|---|---|
+| GET/POST | /api/maintenance/cleanup | Reap stale `pending` uploads (>24h) and retry deferred R2 deletions | Shared secret |
+
+Protected by `MAINTENANCE_SECRET` (header `x-maintenance-secret` or `Authorization: Bearer`), or
+`CRON_SECRET` for Vercel Cron. Denies with 401 when no secret is configured. Intended to run on a
+schedule, not from the app UI.
+
 ## Validation Rules (server-side, non-negotiable)
 - `amount` > 0; `gstAmount` >= 0 and <= `amount`; `amount` is the GST-inclusive total.
 - `occurredAt` cannot be in the future (tolerate small clock skew).
@@ -104,7 +113,7 @@ All errors return `{ error: string, code: string }` with an appropriate HTTP sta
 Implemented: Neon Auth proxy; projects/members/categories; transactions (list/create/update/delete/
 restore) with two-phase R2 upload linking, editor-any edits, optimistic locking and idempotency;
 diary (list/create/update/delete) with multi-image linking; budgets (list with derived actual +
-variance, create/upsert, revise with revision history); timeline; dashboard.
+variance, create/upsert, revise with revision history); timeline; dashboard; maintenance cleanup.
 
-Pending: scheduled orphan-`pending` cleanup and R2 deletion retries; Neon Auth trusted-origin
+Pending: Members/Settings UI screens (APIs exist); PWA service worker; Neon Auth trusted-origin
 configuration; production `prisma migrate deploy` release process.

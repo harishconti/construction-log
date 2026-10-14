@@ -27,6 +27,8 @@ is registered at Hostinger; nameservers point to Cloudflare.
 - Enforces role-based authorization **server-side** on every read/write (session + project membership).
 - Issues short-lived R2 presigned PUT/GET URLs; persists attachment metadata only after finalize.
 - Computes budget vs actual on read (never stores derived "actual").
+- Exposes a secret-protected maintenance endpoint (`/api/maintenance/cleanup`) that reaps stale
+  `pending` uploads and retries deferred R2 object deletions; invoked by a daily Vercel Cron.
 - **Serverless constraints**: stateless; no local disk persistence, no long-running jobs, no
   WebSocket server. Long jobs (backups, cleanup) run outside the request path.
 
@@ -76,5 +78,6 @@ is registered at Hostinger; nameservers point to Cloudflare.
 - Vercel outage → app unavailable; data intact in Neon.
 - Neon compute suspended on idle → first request pays a wake-up latency (expected; do not heartbeat).
 - R2 outage → images unreachable but transaction/diary text still loads (graceful image fallback).
+  Deletions that fail are queued in `ObjectDeletion` and retried by the maintenance job.
 - Corrupted/deleted data → restore from encrypted DB exports (separate private bucket + independent copy);
   business-table SQL dump alone does not restore Neon Auth config.

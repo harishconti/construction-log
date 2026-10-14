@@ -41,6 +41,9 @@ viewer on another. Every check is server-side and re-reads membership from the d
 7. **No automatic membership on sign-up** — new accounts belong to no project. Bootstrap the initial
    admin via seed/CLI for a known Neon Auth user id; avoid a public first-sign-up-wins-admin route.
 8. **Last admin safeguard** — the final admin of a project cannot be removed or demoted.
+9. **Maintenance endpoints are not user-facing** — `/api/maintenance/*` is gated by a shared
+   `MAINTENANCE_SECRET`/`CRON_SECRET` and is not part of the per-project role model. It denies with
+   401 when no secret is configured and never returns project data to unauthenticated callers.
 
 ## Acceptance Checks (must hold)
 - [ ] Viewer POST/PATCH/DELETE denied even via manual API calls.

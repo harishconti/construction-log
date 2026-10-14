@@ -48,6 +48,7 @@ npx prisma migrate deploy    # production / CI
 | `NEON_AUTH_COOKIE_SECRET` | own secret | own secret | own secret |
 | `APP_URL` / `NEXT_PUBLIC_APP_URL` | `http://localhost:3000` | preview URL | `https://build.harishspace.in` |
 | `R2_ACCOUNT_ID`, `R2_ENDPOINT`, `R2_ACCESS_KEY_ID`, `R2_SECRET_ACCESS_KEY`, `R2_BUCKET`, `R2_REGION` | dev bucket | preview bucket | `construction-ledger-prod` |
+| `MAINTENANCE_SECRET` | own secret | own secret | own secret |
 
 - Never give preview builds production DB/Auth/R2 credentials by default.
 - `NEXT_PUBLIC_*` values are browser-visible and embedded at build time — never put secrets there.
@@ -75,9 +76,11 @@ npx prisma migrate deploy    # production / CI
 - Long jobs (DB exports, orphan cleanup) run outside request handlers via a scheduler.
 
 ## 7. Scheduled maintenance
-- **Orphan/pending upload cleanup** and **deletion retries**: a scheduled job (Vercel Cron only if the
-  current Hobby frequency/runtime limits fit, otherwise an external scheduler). Protect the endpoint
-  with a shared secret (`MAINTENANCE_SECRET`).
+- **Cleanup job**: `GET /api/maintenance/cleanup` reaps `pending` uploads older than 24h and retries
+  deferred R2 object deletions. It is wired as a **daily Vercel Cron** in `vercel.json`
+  (`0 3 * * *`). It authenticates with a shared secret: set `MAINTENANCE_SECRET`, or rely on Vercel
+  Cron's `CRON_SECRET` (Vercel sends `Authorization: Bearer $CRON_SECRET`). With neither set, the
+  endpoint denies (401). If the Hobby cron/runtime limits don't fit, call it from an external scheduler.
 - **Backups**: encrypted database exports — suggested 7 daily + 4 weekly — stored in a separate
   private bucket and ideally an independent copy. Restore is tested into an isolated database before
   launch. Business-table dumps do **not** restore Neon Auth config.

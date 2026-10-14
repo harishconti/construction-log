@@ -1,8 +1,8 @@
 # Construction Ledger — Project Overview
 
 > Infrastructure is defined by `08-INFRA-SETUP-CHECKLIST.md` (Vercel + Neon + Cloudflare), which is
-> authoritative over any older note in this repo. These docs describe the **target design**;
-> items not yet implemented are marked _(to implement)_.
+> authoritative over any older note in this repo. These docs describe the design; see
+> **`09-IMPLEMENTATION-STATUS.md`** for what is actually built (most of the app is implemented).
 
 ## Purpose
 A self-hosted-style web + mobile (PWA) application to track all financial transactions, site

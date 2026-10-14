@@ -197,10 +197,23 @@ model IdempotencyKey {
   userId      String
   key         String
   requestHash String
-  responseId  String?
+  response    Json?
   createdAt   DateTime @default(now())
 
   @@unique([projectId, userId, key])
+  @@index([createdAt])
+}
+
+/// Retry queue for R2 object deletions that failed or were deferred.
+model ObjectDeletion {
+  id        String   @id @default(cuid())
+  projectId String?
+  fileKey   String
+  attempts  Int      @default(0)
+  lastError String?
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
   @@index([createdAt])
 }
 ```
@@ -232,11 +245,11 @@ model IdempotencyKey {
 - Keep application migrations out of the provider-managed `neon_auth` schema.
 
 ## Implementation Status
-Implemented (migrations under `prisma/migrations`): `User.id` = Neon Auth id with no `passwordHash`;
-`version` columns on Project/Transaction/DiaryEntry/Budget; `Attachment` with `transactionId`/
-`diaryEntryId`/`status`/`size`; the `attachment_parent_check` and `attachment_status_check` CHECK
-constraints; `IdempotencyKey` with a stored `response`. Prisma uses pooled `DATABASE_URL` + direct
-`DIRECT_URL`.
+Implemented (migrations under `prisma/migrations`: `init`, `attachment_parent_check`,
+`idempotency_response`, `object_deletion_queue`): `User.id` = Neon Auth id with no `passwordHash`;
+`version` columns on Project/Transaction/DiaryEntry/Budget; `Attachment` with
+`transactionId`/`diaryEntryId`/`status`/`size`; the `attachment_parent_check` and
+`attachment_status_check` CHECK constraints; `IdempotencyKey` with a stored `response`;
+`ObjectDeletion` retry queue. Prisma uses pooled `DATABASE_URL` + direct `DIRECT_URL`.
 
-Pending: `checksum` column population; scheduled orphan-`pending` reclamation and R2 deletion retries;
-diary/budget endpoints that consume these models.
+Pending: `checksum` column population.
