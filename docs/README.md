@@ -15,6 +15,7 @@ Everything else describes the app design; see **`09-IMPLEMENTATION-STATUS.md`** 
 | [07-CLAUDE-BUILD-PROMPT.md](07-CLAUDE-BUILD-PROMPT.md) | Build brief for a coding agent |
 | [08-INFRA-SETUP-CHECKLIST.md](08-INFRA-SETUP-CHECKLIST.md) | **Authoritative** infra setup checklist |
 | [09-IMPLEMENTATION-STATUS.md](09-IMPLEMENTATION-STATUS.md) | What is implemented vs pending, endpoints, schema, env, tests |
+| [10-OPERATIONS.md](10-OPERATIONS.md) | Environments/branches, release (migrations), backups/restore, expanding users |
 
 ## Repository layout
 ```

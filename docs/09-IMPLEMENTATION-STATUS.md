@@ -74,8 +74,11 @@ PWA: `manifest.json` + service worker (`public/sw.js`, registered in production)
 2. **Members invite UX**: invite requires the invitee to have signed up first; no email invite flow.
 3. **Neon Auth config**: add trusted origins (`https://build.harishspace.in`, preview), review sign-up controls.
 4. **R2 CORS**: allow `localhost:3000` (+ production origin) for PUT/GET/HEAD.
-5. **Release process**: production `prisma migrate deploy`; encrypted backups (7 daily / 4 weekly); separate prod bucket/credentials.
-6. **Dev/prod isolation**: local dev currently targets the default (production) Neon branch — create a `dev` branch.
+5. **Release/backup tooling**: `npm run db:backup` / `db:restore` + `prisma:deploy` implemented (see
+   `10-OPERATIONS.md`); still to do: schedule backups outside Vercel, provision a separate prod backup
+   bucket/credentials, and a documented Neon Auth recovery step.
+6. **Dev/prod isolation**: local dev currently targets the default (production) Neon branch — create a
+   `dev` branch (needs Neon CLI auth; procedure in `10-OPERATIONS.md`).
 7. **Optional hardening**: malware/AV scanning on finalize; magic-byte content sniffing to reject mismatched types (defence in depth).
 
 ## Environment variables

@@ -81,9 +81,10 @@ npx prisma migrate deploy    # production / CI
   (`0 3 * * *`). It authenticates with a shared secret: set `MAINTENANCE_SECRET`, or rely on Vercel
   Cron's `CRON_SECRET` (Vercel sends `Authorization: Bearer $CRON_SECRET`). With neither set, the
   endpoint denies (401). If the Hobby cron/runtime limits don't fit, call it from an external scheduler.
-- **Backups**: encrypted database exports — suggested 7 daily + 4 weekly — stored in a separate
-  private bucket and ideally an independent copy. Restore is tested into an isolated database before
-  launch. Business-table dumps do **not** restore Neon Auth config.
+- **Backups**: `npm run db:backup` dumps the `public` schema, encrypts it, and uploads to R2
+  (`backups/`); `npm run db:restore -- --key … --target … --yes` restores. Suggest 7 daily + 4 weekly
+  copies in a separate private bucket and an independent copy; test a restore into an isolated DB before
+  launch. Business-table dumps do **not** restore Neon Auth config. See `10-OPERATIONS.md`.
 
 ## 8. Monitoring
 - Watch Neon compute/storage/transfer, R2 storage/operations, and Vercel function usage/quotas.
