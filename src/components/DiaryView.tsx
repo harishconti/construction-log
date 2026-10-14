@@ -206,6 +206,9 @@ export function DiaryView({
         </div>
       )}
 
+      {/* Keeps the last entry clear of the floating Add button. */}
+      {canWrite && <div aria-hidden className="h-20 md:hidden" />}
+
       {canWrite && (
         <button
           type="button"

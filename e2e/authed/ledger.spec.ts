@@ -121,11 +121,33 @@ test('add a diary entry', async ({ page }) => {
 });
 
 test('no page scrolls sideways on mobile (long project/vendor names)', async ({ page }) => {
+  await page.setViewportSize({ width: 360, height: 740 }); // narrowest common Android width
   for (const path of ['/projects', '', '/transactions', '/timeline', '/diary', '/budgets', '/more', '/members', '/settings']) {
     await page.goto(path === '/projects' ? path : `/projects/${projectId}${path}`);
     await page.waitForLoadState('networkidle');
     const overflow = await page.evaluate(() => document.documentElement.scrollWidth - document.documentElement.clientWidth);
     expect(overflow, `horizontal overflow on ${path || 'dashboard'}`).toBeLessThanOrEqual(0);
+  }
+  // The Week/Month toggle must stay on one line next to the period stepper (it used to wrap).
+  await page.goto(`/projects/${projectId}/budgets`);
+  for (const name of ['Week', 'Month']) {
+    await page.getByRole('radio', { name }).click();
+    const box = await page.getByRole('radiogroup').boundingBox();
+    expect(box?.height, `${name} toggle height`).toBeLessThan(60);
+  }
+});
+
+test('the floating Add button never covers the last row', async ({ page }) => {
+  for (const [path, row] of [['/transactions', 'li[data-tx]'], ['/diary', 'main li']] as const) {
+    await page.goto(`/projects/${projectId}${path}`);
+    await page.waitForLoadState('networkidle');
+    const { last, fab } = await page.evaluate((sel) => {
+      window.scrollTo(0, document.documentElement.scrollHeight);
+      const rows = [...document.querySelectorAll(sel)].filter((e) => (e as HTMLElement).offsetParent);
+      const fabEl = [...document.querySelectorAll('button.fixed')].find((b) => /^Add /.test(b.getAttribute('aria-label') ?? ''));
+      return { last: rows.at(-1)?.getBoundingClientRect().bottom ?? 0, fab: fabEl?.getBoundingClientRect().top ?? Infinity };
+    }, row);
+    expect(last, `${path}: last row bottom vs FAB top`).toBeLessThanOrEqual(fab);
   }
 });
 

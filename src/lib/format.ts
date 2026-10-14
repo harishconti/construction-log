@@ -41,3 +41,17 @@ export function formatDayLabel(value: string | Date, now: Date = new Date()): st
   if (target === key(new Date(now.getTime() - 86400000))) return 'Yesterday';
   return formatDate(d);
 }
+
+/** `12–18 Oct`, or `28 Sept – 4 Oct` across months, for a [start, endExclusive) week in IST. */
+export function formatWeekRange(start: string | Date, endExclusive: string | Date): string {
+  const s = new Date(start);
+  const e = new Date(new Date(endExclusive).getTime() - 1);
+  if (Number.isNaN(s.getTime()) || Number.isNaN(e.getTime())) return '—';
+  const part = (d: Date, opts: Intl.DateTimeFormatOptions) =>
+    new Intl.DateTimeFormat('en-IN', { ...opts, timeZone: 'Asia/Kolkata' }).format(d);
+  const sMonth = part(s, { month: 'short' });
+  const eMonth = part(e, { month: 'short' });
+  const sDay = part(s, { day: 'numeric' });
+  const eDay = part(e, { day: 'numeric' });
+  return sMonth === eMonth ? `${sDay}–${eDay} ${eMonth}` : `${sDay} ${sMonth} – ${eDay} ${eMonth}`;
+}
