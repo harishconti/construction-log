@@ -173,7 +173,13 @@ export default function LoginPage() {
               <path fill="#4CAF50" d="M24 45c5.2 0 9.9-2 13.4-5.2l-6.2-5.2C29.3 36 26.8 36 24 36c-5.3 0-9.7-3.4-11.3-8.1l-6.2 4.8C9.7 40.5 16.3 45 24 45z" />
               <path fill="#1976D2" d="M43.6 20.5H24v7.1h11.3c-.8 2.3-2.3 4.2-4.1 5.6l6.2 5.2C41.2 34.9 44 30.4 44 25c0-1.5-.2-3-.4-4.5z" />
             </svg>
-            {socialPending ? 'Redirecting…' : 'Continue with Google'}
+            {socialPending
+              ? mode === 'sign-up'
+                ? 'Creating account…'
+                : 'Signing in…'
+              : mode === 'sign-up'
+                ? 'Sign up with Google'
+                : 'Sign in with Google'}
           </button>
         </div>
 
