@@ -1,6 +1,7 @@
 import { randomUUID } from 'node:crypto';
 import {
   DeleteObjectCommand,
+  DeleteObjectsCommand,
   GetObjectCommand,
   HeadObjectCommand,
   PutObjectCommand,
@@ -94,4 +95,19 @@ export async function headObjectSize(fileKey: string): Promise<number | null> {
 export async function deleteObject(fileKey: string): Promise<void> {
   const c = config();
   await s3().send(new DeleteObjectCommand({ Bucket: c.bucket, Key: fileKey }));
+}
+
+/** Batch-deletes up to 1000 keys. Returns which keys were deleted and which failed. */
+export async function deleteObjects(keys: string[]): Promise<{ deleted: string[]; failed: string[] }> {
+  if (keys.length === 0) return { deleted: [], failed: [] };
+  const c = config();
+  const res = await s3().send(
+    new DeleteObjectsCommand({
+      Bucket: c.bucket,
+      Delete: { Objects: keys.map((Key) => ({ Key })), Quiet: false },
+    }),
+  );
+  const deleted = (res.Deleted ?? []).map((d) => d.Key).filter((k): k is string => Boolean(k));
+  const failed = (res.Errors ?? []).map((e) => e.Key).filter((k): k is string => Boolean(k));
+  return { deleted, failed };
 }

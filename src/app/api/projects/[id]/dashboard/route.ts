@@ -30,7 +30,7 @@ export const GET = handle<Ctx>(async (req, { params: paramsPromise }) => {
       _sum: { amount: true },
     }),
     prisma.budget.findMany({ where: { projectId: params.id, periodType: 'month', periodStart } }),
-    prisma.category.findMany({ where: { projectId: params.id, isActive: true }, select: { id: true, name: true } }),
+    prisma.category.findMany({ where: { projectId: params.id }, select: { id: true, name: true } }),
     prisma.transaction.findMany({
       where: { projectId: params.id, deletedAt: null },
       orderBy: [{ occurredAt: 'desc' }, { createdAt: 'desc' }],

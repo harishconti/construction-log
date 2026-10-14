@@ -50,3 +50,11 @@ export const api = {
     }),
   delete: <T>(path: string) => request<T>(path, { method: 'DELETE' }),
 };
+
+/** A fresh idempotency key. Falls back when `crypto.randomUUID` is unavailable (plain-HTTP dev). */
+export function newIdempotencyKey(): string {
+  if (typeof crypto !== 'undefined' && typeof crypto.randomUUID === 'function') {
+    return crypto.randomUUID();
+  }
+  return `k-${Date.now()}-${Math.random().toString(36).slice(2)}`;
+}

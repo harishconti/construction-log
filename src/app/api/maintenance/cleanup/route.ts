@@ -1,8 +1,9 @@
 import { ApiError, handle, json } from '@/lib/api';
 import { prisma } from '@/lib/prisma';
-import { deleteObject, isR2Configured } from '@/lib/r2';
+import { deleteObjects, isR2Configured } from '@/lib/r2';
 import {
   DELETE_TTL_MS,
+  IDEMPOTENCY_TTL_MS,
   PENDING_TTL_MS,
   maintenanceSecrets,
   providedMaintenanceSecret,
@@ -44,34 +45,45 @@ const run = handle(async (req) => {
     });
   }
 
-  // 2) Retry deferred R2 deletions (bounded attempts, plus retry anything older than the TTL).
+  // 2) Retry deferred R2 deletions in batches (bounded attempts, plus retry anything older than the TTL).
   let deleted = 0;
   let failed = 0;
   if (isR2Configured()) {
     const queue = await prisma.objectDeletion.findMany({
       where: { OR: [{ attempts: { lt: 10 } }, { createdAt: { lt: new Date(now - DELETE_TTL_MS) } }] },
       orderBy: { createdAt: 'asc' },
-      take: 500,
+      take: 1000,
+      select: { id: true, fileKey: true },
     });
-    for (const item of queue) {
-      try {
-        await deleteObject(item.fileKey);
-        await prisma.objectDeletion.delete({ where: { id: item.id } });
-        deleted += 1;
-      } catch (err) {
-        await prisma.objectDeletion.update({
-          where: { id: item.id },
-          data: { attempts: { increment: 1 }, lastError: String(err).slice(0, 500) },
+    if (queue.length) {
+      const idByKey = new Map(queue.map((q) => [q.fileKey, q.id]));
+      const { deleted: okKeys, failed: badKeys } = await deleteObjects(queue.map((q) => q.fileKey));
+
+      const okIds = okKeys.map((k) => idByKey.get(k)).filter((v): v is string => Boolean(v));
+      if (okIds.length) await prisma.objectDeletion.deleteMany({ where: { id: { in: okIds } } });
+
+      const badIds = badKeys.map((k) => idByKey.get(k)).filter((v): v is string => Boolean(v));
+      if (badIds.length) {
+        await prisma.objectDeletion.updateMany({
+          where: { id: { in: badIds } },
+          data: { attempts: { increment: 1 }, lastError: 'batch delete failed' },
         });
-        failed += 1;
       }
+      deleted = okKeys.length;
+      failed = badKeys.length;
     }
   }
+
+  // 3) Purge old idempotency keys (the mutation they guard is long committed).
+  const purgedKeys = (
+    await prisma.idempotencyKey.deleteMany({ where: { createdAt: { lt: new Date(now - IDEMPOTENCY_TTL_MS) } } })
+  ).count;
 
   return json({
     cleanedAttachments: stale.length,
     deletedObjects: deleted,
     failedDeletions: failed,
+    purgedKeys,
     at: new Date().toISOString(),
   });
 });

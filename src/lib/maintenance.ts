@@ -8,6 +8,9 @@ export const PENDING_TTL_MS = 24 * MS_PER_HOUR;
 /** Deferred deletions older than this are retried even after the attempt cap. */
 export const DELETE_TTL_MS = 7 * 24 * MS_PER_HOUR;
 
+/** Idempotency keys older than this are purged by the cleanup job. */
+export const IDEMPOTENCY_TTL_MS = 7 * 24 * MS_PER_HOUR;
+
 /** Constant-time comparison of a provided secret against any accepted secret. */
 export function secretMatches(provided: string | null, secrets: string[]): boolean {
   if (!provided || secrets.length === 0) return false;

@@ -85,15 +85,18 @@ member of project A cannot read or write project B.
 | Method | Path | Description | Min Role |
 |---|---|---|---|
 | GET | /api/projects/:id/budgets?period=YYYY-MM&granularity=month | List budgets + computed actual + variance | viewer |
-| POST | /api/projects/:id/budgets | Create/upsert budget for category+period | admin |
-| PATCH | /api/projects/:id/budgets/:budgetId | Revise planned amount (writes BudgetRevision) | admin |
+| POST | /api/projects/:id/budgets | Create/upsert budget for category+period (201 create, 200 update) | admin |
+| PATCH | /api/projects/:id/budgets/:budgetId | Revise planned amount / note (writes BudgetRevision) | admin |
 | GET | /api/projects/:id/budgets/:budgetId/revisions | Revision history | viewer |
 
 ## Dashboard / Timeline
 | Method | Path | Description | Min Role |
 |---|---|---|---|
-| GET | /api/projects/:id/timeline?from=&to= | Merged chronological feed of transactions + diary entries | viewer |
+| GET | /api/projects/:id/timeline?from=&to=&limit=&before= | Merged chronological feed of transactions + diary entries | viewer |
 | GET | /api/projects/:id/dashboard?period=month&date=YYYY-MM | Summary: total spend, by-category breakdown, budget variance | viewer |
+
+- **Timeline** uses keyset (cursor) pagination on `(date, id)`: pass `limit` and, to page, the opaque
+  `before` cursor returned as `nextCursor`. Response is `{ items, nextCursor, hasMore }` (no total/cap).
 
 ## Maintenance
 | Method | Path | Description | Access |
@@ -107,7 +110,7 @@ schedule, not from the app UI.
 ## System
 | Method | Path | Description | Access |
 |---|---|---|---|
-| GET | /api/health | Liveness/readiness (`{ status, db, time }`); exposes no secrets | Public |
+| GET | /api/health | Liveness/readiness (`{ status, db, time }`); 200 healthy, 503 when the DB is unreachable. Exposes no secrets | Public |
 
 ## Validation Rules (server-side, non-negotiable)
 - `amount` > 0; `gstAmount` >= 0 and <= `amount`; `amount` is the GST-inclusive total.

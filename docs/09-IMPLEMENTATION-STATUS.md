@@ -81,10 +81,18 @@ and refuses relink/deleted parents · `#5` diary delete queues R2 objects · `#6
 `todayIST()` for form dates · `#10–12` Prisma P2002→409/P2025→404/P2034→409, date-param validation
 (422), money bounds + 2-decimal rule.
 
-**Batch A2 — pending:** timeline keyset pagination, inactive categories in reports/edit, server-side
-file-count cap, budgets POST upsert/version, UI idempotency-key reuse, per-request DB cost,
-cleanup/idempotency-key hygiene, CI on all branches + API tests. **A3 & B5–B6 pending** (hardening,
-dependency upgrades, dashboard/budgets rework, polish).
+**Batch A2 — done** (robustness, perf, ops): `#13` timeline keyset pagination (no fetch cap) · `#14`
+inactive categories shown in budgets/dashboard when they have spend or a budget, and selectable when
+editing their transactions · `#15` 10-file-per-record cap enforced server-side (link + finalize) ·
+`#16` budgets POST is atomic (201 create / 200 update) and PATCH can set `note` · `#17` UI reuses one
+idempotency key across retries · `#18` `getCurrentUser` is request-cached, the user mirror only writes
+on change, and `requireRole` uses one query for members · `#19` `/api/health` returns 503 when the DB is
+down · `#20` cleanup batch-deletes R2 objects and purges stale idempotency keys · `#21` CI runs on all
+branches.
+
+**Batch A3 & B5–B6 — pending** (hardening: rate limiting, security headers, magic-byte sniff,
+backup/restore hardening, dependency upgrades, enum/CHECK constraints; design: dashboard/budgets rework
+and polish/PWA assets).
 
 ## Not yet implemented (backlog)
 1. **Magic link**: UI is wired (`signIn.magicLink`), but the branch reports `magicLink.enabled: false`

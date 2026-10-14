@@ -166,6 +166,7 @@ export const createBudgetSchema = z.object({
 
 export const updateBudgetSchema = z.object({
   plannedAmount: moneyNonNegative,
+  note: z.string().trim().max(500).optional().nullable(),
   reason: z.string().trim().max(500).optional().nullable(),
   version: z.number().int().min(0).optional(),
 });

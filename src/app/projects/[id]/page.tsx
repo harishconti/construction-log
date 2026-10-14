@@ -28,7 +28,7 @@ export default async function ProjectDashboard({ params }: { params: Promise<{ i
       _sum: { amount: true },
     }),
     prisma.budget.findMany({ where: { projectId: id, periodType: 'month', periodStart } }),
-    prisma.category.findMany({ where: { projectId: id, isActive: true }, select: { id: true, name: true } }),
+    prisma.category.findMany({ where: { projectId: id }, select: { id: true, name: true } }),
     prisma.transaction.findMany({
       where: { projectId: id, deletedAt: null },
       orderBy: [{ occurredAt: 'desc' }, { createdAt: 'desc' }],

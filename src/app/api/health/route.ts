@@ -3,7 +3,7 @@ import { prisma } from '@/lib/prisma';
 
 export const dynamic = 'force-dynamic';
 
-/** Liveness/readiness probe. Exposes no secrets; just whether the app and DB respond. */
+/** Liveness/readiness probe. Exposes no secrets; 503 when the database is unreachable. */
 export const GET = handle(async () => {
   let db = false;
   try {
@@ -12,5 +12,5 @@ export const GET = handle(async () => {
   } catch {
     db = false;
   }
-  return json({ status: 'ok', db, time: new Date().toISOString() });
+  return json({ status: db ? 'ok' : 'degraded', db, time: new Date().toISOString() }, db ? 200 : 503);
 });

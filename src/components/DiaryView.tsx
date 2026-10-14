@@ -1,7 +1,7 @@
 'use client';
 
-import { useCallback, useEffect, useState } from 'react';
-import { api } from '@/lib/api-client';
+import { useCallback, useEffect, useRef, useState } from 'react';
+import { api, newIdempotencyKey } from '@/lib/api-client';
 import { todayIST } from '@/lib/period';
 import { AttachmentList, type AttachmentItem } from '@/components/AttachmentList';
 
@@ -182,6 +182,7 @@ function DiaryForm({
   const [files, setFiles] = useState<FileList | null>(null);
   const [pending, setPending] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const idemKey = useRef<string>(newIdempotencyKey());
 
   async function uploadFile(f: File, parentId?: string): Promise<string> {
     const presign = await api.post<{ uploadUrl: string; attachmentId: string }>('/api/uploads/presign', {
@@ -219,8 +220,9 @@ function DiaryForm({
         await api.post(
           `/api/projects/${projectId}/diary`,
           { entryDate: new Date(entryDate).toISOString(), title, body, attachmentIds },
-          { 'Idempotency-Key': crypto.randomUUID() },
+          { 'Idempotency-Key': idemKey.current },
         );
+        idemKey.current = newIdempotencyKey();
       }
       onSaved();
     } catch (err) {

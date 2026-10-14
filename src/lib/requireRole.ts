@@ -18,22 +18,21 @@ export async function requireRole(
   userId: string,
   minRole: Role,
 ): Promise<ProjectAccess> {
-  const project = await prisma.project.findUnique({
-    where: { id: projectId },
-    select: { id: true },
-  });
-  if (!project) throw ApiError.notFound('Project not found');
-
+  // Fast path: one query for members (the common case).
   const membership = await prisma.projectMember.findUnique({
     where: { projectId_userId: { projectId, userId } },
     select: { role: true },
   });
-  if (!membership) throw ApiError.forbidden('You are not a member of this project');
-
-  const role = membership.role as Role;
-  if (!hasMinRole(role, minRole)) {
-    throw ApiError.forbidden(`Requires ${minRole} role or higher`);
+  if (membership) {
+    const role = membership.role as Role;
+    if (!hasMinRole(role, minRole)) {
+      throw ApiError.forbidden(`Requires ${minRole} role or higher`);
+    }
+    return { projectId, userId, role };
   }
 
-  return { projectId, userId, role };
+  // Not a member: distinguish "no such project" (404) from "not a member" (403).
+  const project = await prisma.project.findUnique({ where: { id: projectId }, select: { id: true } });
+  if (!project) throw ApiError.notFound('Project not found');
+  throw ApiError.forbidden('You are not a member of this project');
 }

@@ -1,3 +1,4 @@
+import { cache } from 'react';
 import { ApiError } from '@/lib/api';
 import { prisma } from '@/lib/prisma';
 import { writeAudit } from '@/lib/audit';
@@ -27,14 +28,32 @@ function normalise(u: NeonUser): { id: string; email: string; name: string } {
 
 async function mirrorUser(u: NeonUser): Promise<AppUser> {
   const { id, email, name } = normalise(u);
-  const user = await prisma.user.upsert({
+
+  const existing = await prisma.user.findUnique({
     where: { id },
-    update: { email, name },
-    create: { id, email, name },
     select: { id: true, name: true, email: true },
   });
-  await claimInvitations(user);
-  return user;
+  if (existing) {
+    // Avoid a write on every request when nothing changed.
+    if (existing.email === email && existing.name === name) {
+      await claimInvitations(existing);
+      return existing;
+    }
+    const updated = await prisma.user.update({
+      where: { id },
+      data: { email, name },
+      select: { id: true, name: true, email: true },
+    });
+    await claimInvitations(updated);
+    return updated;
+  }
+
+  const created = await prisma.user.create({
+    data: { id, email, name },
+    select: { id: true, name: true, email: true },
+  });
+  await claimInvitations(created);
+  return created;
 }
 
 /** Applies any non-expired pending email invitations once the account exists. Idempotent and cheap when empty. */
@@ -66,13 +85,13 @@ async function claimInvitations(user: { id: string; email: string }): Promise<vo
   });
 }
 
-/** Returns the signed-in app user (mirrored locally), or null. */
-export async function getCurrentUser(): Promise<AppUser | null> {
+/** Returns the signed-in app user (mirrored locally), or null. Cached per request. */
+export const getCurrentUser = cache(async (): Promise<AppUser | null> => {
   const { data: session } = await auth.getSession();
   const neonUser = session?.user as NeonUser | undefined;
   if (!neonUser?.id) return null;
   return mirrorUser(neonUser);
-}
+});
 
 /** Like getCurrentUser but throws 401 when unauthenticated. */
 export async function requireUser(): Promise<AppUser> {

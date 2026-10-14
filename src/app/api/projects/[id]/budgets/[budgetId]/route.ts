@@ -23,7 +23,11 @@ export const PATCH = handle<Ctx>(async (req, { params: paramsPromise }) => {
   const budget = await prisma.$transaction(async (tx) => {
     const res = await tx.budget.updateMany({
       where: { id: budgetId, version: before.version },
-      data: { plannedAmount: body.plannedAmount, version: { increment: 1 } },
+      data: {
+        plannedAmount: body.plannedAmount,
+        ...(body.note !== undefined ? { note: body.note } : {}),
+        version: { increment: 1 },
+      },
     });
     if (res.count === 0) {
       throw new ApiError(409, 'VERSION_CONFLICT', 'Budget was modified by someone else');

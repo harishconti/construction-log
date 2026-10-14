@@ -1,7 +1,7 @@
 'use client';
 
-import { useCallback, useEffect, useState } from 'react';
-import { api } from '@/lib/api-client';
+import { useCallback, useEffect, useRef, useState } from 'react';
+import { api, newIdempotencyKey } from '@/lib/api-client';
 import { todayIST } from '@/lib/period';
 import { AttachmentList, type AttachmentItem } from '@/components/AttachmentList';
 
@@ -350,8 +350,16 @@ function TransactionForm({
   const [file, setFile] = useState<File | null>(null);
   const [pending, setPending] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  // Stable across retries so a network retry of the same entry is deduplicated.
+  const idemKey = useRef<string>(newIdempotencyKey());
 
-  const selectedCategoryId = categoryId || categories[0]?.id || '';
+  // Include the (possibly inactive) category of an edited transaction so it stays selectable.
+  const options: Category[] =
+    entry && !categories.some((c) => c.id === entry.category.id)
+      ? [{ id: entry.category.id, name: `${entry.category.name} (inactive)`, type: '' }, ...categories]
+      : categories;
+
+  const selectedCategoryId = categoryId || options[0]?.id || '';
 
   async function uploadPhoto(f: File, parentId?: string): Promise<string> {
     const presign = await api.post<{ uploadUrl: string; attachmentId: string }>('/api/uploads/presign', {
@@ -402,8 +410,9 @@ function TransactionForm({
             description: description || null,
             attachmentIds,
           },
-          { 'Idempotency-Key': crypto.randomUUID() },
+          { 'Idempotency-Key': idemKey.current },
         );
+        idemKey.current = newIdempotencyKey();
       }
       onSaved();
     } catch (err) {
@@ -413,7 +422,7 @@ function TransactionForm({
     }
   }
 
-  if (categories.length === 0) {
+  if (options.length === 0) {
     return (
       <div className="rounded-xl bg-white p-4 text-sm text-slate-500 shadow-sm">
         Create a category first (Settings) before adding transactions.
@@ -431,7 +440,7 @@ function TransactionForm({
             onChange={(e) => setCategoryId(e.target.value)}
             className="mt-1 w-full rounded-lg border border-slate-300 px-3 py-2"
           >
-            {categories.map((c) => (
+            {options.map((c) => (
               <option key={c.id} value={c.id}>
                 {c.name}
               </option>

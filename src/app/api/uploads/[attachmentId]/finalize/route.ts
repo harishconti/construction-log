@@ -5,7 +5,7 @@ import { requireRole } from '@/lib/requireRole';
 import { writeAudit } from '@/lib/audit';
 import { headObjectSize, isR2Configured } from '@/lib/r2';
 import { serializeAttachment } from '@/lib/serialize';
-import { sizeLimitFor } from '@/lib/files';
+import { MAX_FILES_PER_RECORD, sizeLimitFor } from '@/lib/files';
 import { finalizeAttachmentSchema } from '@/lib/validation/schemas';
 import type { Attachment } from '@prisma/client';
 
@@ -107,6 +107,13 @@ async function linkIfNeeded(
   }
   if (currentParent) {
     throw ApiError.conflict('Attachment is already linked to another record');
+  }
+
+  const parentField = body.transactionId ? 'transactionId' : 'diaryEntryId';
+  const parentId = body.transactionId ?? body.diaryEntryId ?? '';
+  const count = await prisma.attachment.count({ where: { [parentField]: parentId } });
+  if (count >= MAX_FILES_PER_RECORD) {
+    throw ApiError.badRequest(`At most ${MAX_FILES_PER_RECORD} attachments per record`, 'TOO_MANY_ATTACHMENTS');
   }
 
   const result = await prisma.attachment.updateMany({

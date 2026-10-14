@@ -1,5 +1,6 @@
 import { Prisma } from '@prisma/client';
 import { ApiError } from './api';
+import { MAX_FILES_PER_RECORD } from './files';
 
 type Parent = 'transaction' | 'diary';
 
@@ -17,6 +18,14 @@ export async function linkAttachments(
   if (opts.attachmentIds.length === 0) return;
 
   const field = opts.parent === 'transaction' ? 'transactionId' : 'diaryEntryId';
+
+  const existingCount = await tx.attachment.count({ where: { [field]: opts.parentId } });
+  if (existingCount + opts.attachmentIds.length > MAX_FILES_PER_RECORD) {
+    throw ApiError.badRequest(
+      `At most ${MAX_FILES_PER_RECORD} attachments per record`,
+      'TOO_MANY_ATTACHMENTS',
+    );
+  }
 
   const existing = await tx.attachment.findMany({
     where: { id: { in: opts.attachmentIds } },
