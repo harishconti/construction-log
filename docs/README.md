@@ -16,6 +16,8 @@ Everything else describes the app design; see **`09-IMPLEMENTATION-STATUS.md`** 
 | [08-INFRA-SETUP-CHECKLIST.md](08-INFRA-SETUP-CHECKLIST.md) | **Authoritative** infra setup checklist |
 | [09-IMPLEMENTATION-STATUS.md](09-IMPLEMENTATION-STATUS.md) | What is implemented vs pending, endpoints, schema, env, tests |
 | [10-OPERATIONS.md](10-OPERATIONS.md) | Environments/branches, release (migrations), backups/restore, expanding users |
+| [11-AUDIT.md](11-AUDIT.md) | Codebase audit: bugs, risks and fixes |
+| [12-DESIGN-AUDIT.md](12-DESIGN-AUDIT.md) | Design audit: UI/UX findings, style tokens, mobile + desktop layout |
 
 ## Repository layout
 ```
