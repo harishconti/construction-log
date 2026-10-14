@@ -94,6 +94,10 @@ Cleanest is to reconnect Neon without a prefix. Otherwise, in Vercel → Environ
 - Wait for Vercel "valid" + HTTPS cert, then verify `https://build.harishspace.in`.
 - Then update app URL, Neon Auth allowed origins, and production R2 CORS.
 - Preserve existing website/email records; do not enable Flexible SSL.
+- **Certs:** every hostname you actually serve needs its own valid cert. If the apex redirects to
+  `www` (or vice-versa), the redirect target must be a valid Vercel domain too, or the browser shows
+  "not secure". Simplest is to use one hostname (e.g. apex) as primary, or wait for both to show
+  **Valid** in Vercel. DNS must point at the values Vercel shows, as **DNS-only** (grey cloud).
 - The **Cloudflare Tunnel** (`cloudflared`) from the old Oracle-VM plan is **not used** by Vercel — delete the tunnel and any `*.cfargotunnel.com` DNS record if present. DNS for `harishspace.in` is managed in Cloudflare (nameservers moved there); Hostinger is only the registrar.
 
 ## 6. Runtime constraints (serverless)
