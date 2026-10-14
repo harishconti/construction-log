@@ -12,6 +12,7 @@ import { StatusBadge, ProgressBar, type BudgetStatus } from '@/components/ui/Sta
 import { Alert } from '@/components/ui/Alert';
 import { SkeletonRows } from '@/components/ui/Skeleton';
 import { useToast } from '@/components/ui/Toast';
+import { todayIST } from '@/lib/period';
 
 type Granularity = 'week' | 'month';
 type Row = {
@@ -34,11 +35,12 @@ type Resp = {
   totals: { planned: number; actual: number; variance: number; percentUsed: number | null; status: BudgetStatus | null };
 };
 
+// Period params are IST calendar dates; toISOString() would give the UTC date (yesterday before 05:30 IST).
 function isoDate(d: Date) {
-  return d.toISOString().slice(0, 10);
+  return todayIST(d);
 }
 function yyyymm(d: Date) {
-  return d.toISOString().slice(0, 7);
+  return todayIST(d).slice(0, 7);
 }
 
 export function BudgetsView({ projectId, canEdit }: { projectId: string; canEdit: boolean }) {

@@ -35,6 +35,10 @@ export default defineConfig({
             name: 'authed',
             testDir: './e2e/authed',
             dependencies: ['setup'],
+            // Real round trips to Neon (DB + Auth, often a cold compute on a dev branch): each write
+            // can take seconds, and the API-level specs chain many requests.
+            timeout: 120_000,
+            expect: { timeout: 20_000 },
             use: { ...devices['Pixel 7'], storageState: 'e2e/.auth/user.json' },
           },
         ]

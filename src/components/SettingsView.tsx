@@ -7,6 +7,7 @@ import { Button } from '@/components/ui/Button';
 import { Alert } from '@/components/ui/Alert';
 import { Field, Select, TextInput, Textarea, DateInput } from '@/components/ui/inputs';
 import { useToast } from '@/components/ui/Toast';
+import { todayIST } from '@/lib/period';
 
 type Project = {
   id: string;
@@ -32,7 +33,7 @@ export function SettingsView({ projectId, initialProject }: { projectId: string;
   const [project, setProject] = useState(initialProject);
   const [name, setName] = useState(initialProject.name);
   const [description, setDescription] = useState(initialProject.description ?? '');
-  const [startDate, setStartDate] = useState(initialProject.startDate.slice(0, 10));
+  const [startDate, setStartDate] = useState(todayIST(new Date(initialProject.startDate)));
   const [status, setStatus] = useState(initialProject.status);
   const [savingProject, setSavingProject] = useState(false);
 
@@ -70,7 +71,7 @@ export function SettingsView({ projectId, initialProject }: { projectId: string;
       const res = await api.patch<{ project: Project }>(`/api/projects/${projectId}`, {
         name,
         description: description || null,
-        startDate: new Date(startDate).toISOString(),
+        startDate, // bare YYYY-MM-DD: the server reads it as an IST calendar date
         status,
         version: project.version,
       });

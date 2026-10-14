@@ -75,7 +75,7 @@ export function DiaryView({
   const groups = useMemo(() => {
     const out: { key: string; label: string; entries: Entry[] }[] = [];
     for (const e of items) {
-      const key = e.entryDate.slice(0, 10);
+      const key = todayIST(new Date(e.entryDate));
       let g = out.find((x) => x.key === key);
       if (!g) {
         g = { key, label: formatDayLabel(e.entryDate), entries: [] };
@@ -267,7 +267,7 @@ function DiarySheet({
   onSaved: (message: string) => void;
   onDeleteAttachment: (id: string) => void;
 }) {
-  const [entryDate, setEntryDate] = useState(() => (entry ? entry.entryDate.slice(0, 10) : todayIST()));
+  const [entryDate, setEntryDate] = useState(() => (entry ? todayIST(new Date(entry.entryDate)) : todayIST()));
   const [title, setTitle] = useState(entry?.title ?? '');
   const [body, setBody] = useState(entry?.body ?? '');
   const [pending, setPending] = useState(false);
@@ -290,7 +290,7 @@ function DiarySheet({
     try {
       if (entry) {
         await api.patch(`/api/projects/${projectId}/diary/${entry.id}`, {
-          entryDate: new Date(entryDate).toISOString(),
+          entryDate, // bare YYYY-MM-DD: the server reads it as an IST calendar date
           title,
           body,
           version: entry.version,
@@ -301,7 +301,7 @@ function DiarySheet({
         const attachmentIds = await uploads.finalizeAll();
         await api.post(
           `/api/projects/${projectId}/diary`,
-          { entryDate: new Date(entryDate).toISOString(), title, body, attachmentIds },
+          { entryDate, title, body, attachmentIds },
           { 'Idempotency-Key': idemKey.current },
         );
         idemKey.current = newIdempotencyKey();

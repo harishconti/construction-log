@@ -31,7 +31,8 @@ test('create a project (creator becomes admin, default categories seeded)', asyn
   await sheet.getByLabel('Start date').fill(todayIST());
   await sheet.getByRole('button', { name: 'Create' }).click();
 
-  await expect(page).toHaveURL(/\/projects\/[^/]+$/);
+  // First write on a cold Neon compute (plus seeding default categories) can take several seconds.
+  await expect(page).toHaveURL(/\/projects\/[^/]+$/, { timeout: 20_000 });
   projectId = page.url().split('/').pop()!;
 
   const members = await (await request.get(`/api/projects/${projectId}/members`)).json();

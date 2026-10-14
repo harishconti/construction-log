@@ -49,6 +49,25 @@ export function todayIST(d: Date = new Date()): string {
   return `${t.getUTCFullYear()}-${pad2(t.getUTCMonth() + 1)}-${pad2(t.getUTCDate())}`;
 }
 
+/** A bare `YYYY-MM-DD` calendar date (what `<input type="date">` produces). */
+export const CALENDAR_DATE = /^(\d{4})-(\d{2})-(\d{2})$/;
+
+/**
+ * 00:00 IST on calendar date `YYYY-MM-DD`, as a UTC instant (Invalid Date for malformed or
+ * impossible dates such as 2026-02-30). Never parse these with `new Date()`: that means UTC midnight.
+ */
+export function istDateToInstant(ymd: string): Date {
+  const m = CALENDAR_DATE.exec(ymd);
+  if (!m) return new Date(Number.NaN);
+  const d = istMidnightUtc(Number(m[1]), Number(m[2]) - 1, Number(m[3]));
+  return todayIST(d) === ymd ? d : new Date(Number.NaN);
+}
+
+/** The last millisecond of calendar date `YYYY-MM-DD` in IST (inclusive upper bound for filters). */
+export function istDayEnd(ymd: string): Date {
+  return new Date(istDateToInstant(ymd).getTime() + MS_PER_DAY - 1);
+}
+
 export function isPeriodStartAligned(g: Granularity, d: Date): boolean {
   return normalizePeriodStart(g, d).getTime() === d.getTime();
 }

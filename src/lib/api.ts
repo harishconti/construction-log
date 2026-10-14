@@ -1,6 +1,6 @@
 import { NextResponse } from 'next/server';
 import { Prisma } from '@prisma/client';
-import { ZodError, type ZodSchema } from 'zod';
+import { ZodError, type ZodType, type ZodTypeDef } from 'zod';
 
 export type ApiErrorBody = { error: string; code: string };
 
@@ -87,7 +87,8 @@ export function handle<Ctx = unknown>(fn: Handler<Ctx>): Handler<Ctx> {
   };
 }
 
-export async function parseJson<T>(req: Request, schema: ZodSchema<T>): Promise<T> {
+// Input is `unknown`: T must come from the schema's *output* (e.g. a date string transformed to Date).
+export async function parseJson<T>(req: Request, schema: ZodType<T, ZodTypeDef, unknown>): Promise<T> {
   let raw: unknown;
   try {
     raw = await req.json();

@@ -10,6 +10,7 @@ import { Button } from '@/components/ui/Button';
 import { EmptyState } from '@/components/ui/EmptyState';
 import { SkeletonRows } from '@/components/ui/Skeleton';
 import { DateInput, Field } from '@/components/ui/inputs';
+import { istDateToInstant, istDayEnd } from '@/lib/period';
 
 type Item =
   | {
@@ -52,8 +53,8 @@ export function TimelineView({ projectId }: { projectId: string }) {
     async (cursor: string | null) => {
       const qs = new URLSearchParams({ limit: '25' });
       if (cursor) qs.set('before', cursor);
-      if (from) qs.set('from', new Date(from).toISOString());
-      if (to) qs.set('to', new Date(`${to}T23:59:59`).toISOString());
+      if (from) qs.set('from', istDateToInstant(from).toISOString());
+      if (to) qs.set('to', istDayEnd(to).toISOString());
       return api.get<TimelineResponse>(`/api/projects/${projectId}/timeline?${qs.toString()}`);
     },
     [projectId, from, to],

@@ -27,7 +27,7 @@ export function NewProjectForm() {
       const { project } = await api.post<{ project: { id: string } }>('/api/projects', {
         name,
         description: description || null,
-        startDate: new Date(startDate).toISOString(),
+        startDate, // bare YYYY-MM-DD: the server reads it as an IST calendar date
       });
       setName('');
       setDescription('');
