@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { formatDate, formatDayLabel, formatINR } from '../src/lib/format';
+import { formatDate, formatDayLabel, formatINR, formatWeekRange } from '../src/lib/format';
 
 describe('formatINR', () => {
   it('uses Indian digit grouping with no paise', () => {
@@ -45,5 +45,16 @@ describe('formatDayLabel', () => {
 
   it('falls back to the full date for older days', () => {
     expect(formatDayLabel('2026-10-10T06:00:00Z', now)).toBe('10 Oct 2026');
+  });
+});
+
+describe('formatWeekRange', () => {
+  // Budget weeks are [Monday 00:00 IST, next Monday 00:00 IST) as UTC instants.
+  it('formats a week inside one month compactly', () => {
+    expect(formatWeekRange('2026-10-11T18:30:00.000Z', '2026-10-18T18:30:00.000Z')).toBe('12–18 Oct');
+  });
+
+  it('names both months when the week spans two', () => {
+    expect(formatWeekRange('2026-09-27T18:30:00.000Z', '2026-10-04T18:30:00.000Z')).toBe('28 Sept – 4 Oct');
   });
 });

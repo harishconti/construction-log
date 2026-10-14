@@ -63,7 +63,7 @@ PWA: `manifest.json` + service worker (`public/sw.js`, registered in production)
 - **Maintenance**: reaps `pending` uploads older than 24h and retries deferred R2 deletions (attempt cap + TTL).
 
 ## Verification
-- `npm run typecheck`, `npm run lint`, `npm test` (**111 unit tests**: roles, validation, period/budget
+- `npm run typecheck`, `npm run lint`, `npm test` (**113 unit tests**: roles, validation, period/budget
   math, maintenance auth, file policy, audit regressions, API error mapping/pagination, API client,
   INR/IST formatting, and server guards — `requireRole`, rate limit, audit write, idempotency,
   attachment linking, user-mirror first-sign-in race — with Prisma mocked), `npm run build` — all green.
@@ -72,7 +72,7 @@ PWA: `manifest.json` + service worker (`public/sw.js`, registered in production)
   shape, security headers/CSP, PWA manifest/icons, service worker, Google/mail icons (86 tests, all passing). Authed tier
   (`e2e/authed/`: project/expense/diary flows, version conflict, idempotency, GST rule, no sideways
   scroll on mobile, soft-delete exclusion from totals + restore, budget upsert/variance status/
-  revisions, invitations, last-admin guard) is opt-in via `E2E_ALLOW_WRITES=1` and must target a non-production Neon branch.
+  revisions, invitations, last-admin guard, no sideways scroll or wrapped toggles at 360px, FAB never covers the last row) is opt-in via `E2E_ALLOW_WRITES=1` and must target a non-production Neon branch.
 - Manual e2e against a real Neon project + R2 bucket: auth sign-up/session; project/category/transaction/
   diary/budget CRUD; optimistic-lock 409; idempotent replay; two-phase upload (PUT→finalize→link);
   attachment delete; budgets variance + revision history; timeline merge; dashboard totals; cleanup

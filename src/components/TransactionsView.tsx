@@ -8,7 +8,6 @@ import {
   FunnelX,
   Pencil,
   Plus,
-  Receipt,
   RotateCcw,
   Search,
   SlidersHorizontal,
@@ -30,6 +29,7 @@ import { Skeleton, SkeletonRows } from '@/components/ui/Skeleton';
 import { Lightbox } from '@/components/ui/Lightbox';
 import { RowMenu } from '@/components/ui/RowMenu';
 import { useToast } from '@/components/ui/Toast';
+import { CategoryIcon } from '@/components/CategoryIcon';
 import { DateInput, Field, MoneyInput, Select, Segmented, Textarea, TextInput } from '@/components/ui/inputs';
 
 type Category = { id: string; name: string; type: string };
@@ -43,7 +43,7 @@ type Transaction = {
   description: string | null;
   version: number;
   deletedAt: string | null;
-  category: { id: string; name: string };
+  category: { id: string; name: string; type?: string };
   attachments: AttachmentItem[];
 };
 type Page = { page: number; limit: number; total: number; pages: number };
@@ -304,13 +304,15 @@ export function TransactionsView({ projectId, role }: { projectId: string; role:
     }
     return (
       <span className={`flex ${box} shrink-0 items-center justify-center rounded-sm bg-primary-tint text-primary`} aria-hidden>
-        <Receipt size={18} />
+        <CategoryIcon type={t.category.type} />
       </span>
     );
   }
 
   const mode = (t: Transaction) => PAYMENT_LABEL[t.paymentMode] ?? t.paymentMode;
   const gstLine = (t: Transaction) => (Number(t.gstAmount) > 0 ? `incl. ${formatINR(t.gstAmount)} GST` : null);
+  // Mobile rows show GST under the amount, short enough never to be truncated.
+  const gstShort = (t: Transaction) => (Number(t.gstAmount) > 0 ? `GST ${formatINR(t.gstAmount)}` : null);
   const title = (t: Transaction) => t.vendor || t.category.name;
 
   const empty = !loading && items.length === 0;
@@ -426,31 +428,38 @@ export function TransactionsView({ projectId, role }: { projectId: string; role:
                     >
                       {billCell(t, 'md')}
                       <div className="min-w-0 flex-1">
-                        <div className="flex items-center gap-2">
+                        <div className="flex items-start gap-2">
                           {canEdit && !t.deletedAt ? (
                             <button
                               type="button"
                               onClick={(e) => { e.stopPropagation(); openEdit(t); }}
-                              className="truncate text-left font-medium"
+                              className="line-clamp-2 break-words text-left font-medium leading-snug"
                             >
                               {title(t)}
                             </button>
                           ) : (
-                            <span className={`truncate font-medium ${t.deletedAt ? 'line-through' : ''}`}>{title(t)}</span>
+                            <span className={`line-clamp-2 break-words font-medium leading-snug ${t.deletedAt ? 'line-through' : ''}`}>
+                              {title(t)}
+                            </span>
                           )}
                           {t.deletedAt && <DeletedBadge />}
                         </div>
                         <div className="truncate text-ink-2">
-                          {[t.vendor ? t.category.name : null, mode(t), gstLine(t)].filter(Boolean).join(' · ')}
+                          {[t.vendor ? t.category.name : null, mode(t)].filter(Boolean).join(' · ')}
                         </div>
                       </div>
-                      <span className={`num shrink-0 font-semibold ${t.deletedAt ? 'line-through' : ''}`}>{formatINR(t.amount)}</span>
+                      <div className="shrink-0 text-right">
+                        <div className={`num font-semibold ${t.deletedAt ? 'line-through' : ''}`}>{formatINR(t.amount)}</div>
+                        {gstShort(t) && <div className="num text-xs text-ink-3">{gstShort(t)}</div>}
+                      </div>
                       <div className="flex w-11 shrink-0 justify-center">{trailingActions(t)}</div>
                     </li>
                   ))}
                 </ul>
               </section>
             ))}
+            {/* Keeps the last row clear of the floating Add button. */}
+            {canEdit && <div aria-hidden className="h-20" />}
           </div>
 
           {/* md+: table */}

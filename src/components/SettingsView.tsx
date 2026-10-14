@@ -219,10 +219,10 @@ export function SettingsView({ projectId, initialProject }: { projectId: string;
                     setRenameValue(c.name);
                   }}
                 >
-                  <Pencil size={15} aria-hidden /> Rename
+                  <Pencil size={15} aria-hidden /> <span className="hidden sm:inline">Rename</span>
                 </Button>
                 <Button variant="ghost" aria-label={`Deactivate ${c.name}`} onClick={() => toggleCategory(c)}>
-                  <Archive size={15} aria-hidden /> Deactivate
+                  <Archive size={15} aria-hidden /> <span className="hidden sm:inline">Deactivate</span>
                 </Button>
               </span>
             </li>
@@ -248,7 +248,7 @@ export function SettingsView({ projectId, initialProject }: { projectId: string;
                       {c.name} <span className="text-xs">({TYPE_LABEL[c.type] ?? c.type})</span>
                     </span>
                     <Button variant="ghost" aria-label={`Activate ${c.name}`} onClick={() => toggleCategory(c)}>
-                      <ArchiveRestore size={15} aria-hidden /> Activate
+                      <ArchiveRestore size={15} aria-hidden /> <span className="hidden sm:inline">Activate</span>
                     </Button>
                   </li>
                 ))}

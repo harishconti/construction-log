@@ -3,7 +3,7 @@
 import { useCallback, useEffect, useState } from 'react';
 import { ChevronLeft, ChevronRight, Pencil, Plus } from 'lucide-react';
 import { api } from '@/lib/api-client';
-import { formatDate, formatINR } from '@/lib/format';
+import { formatDate, formatINR, formatWeekRange } from '@/lib/format';
 import { Button } from '@/components/ui/Button';
 import { IconButton } from '@/components/ui/IconButton';
 import { Sheet } from '@/components/ui/Sheet';
@@ -85,7 +85,7 @@ export function BudgetsView({ projectId, canEdit }: { projectId: string; canEdit
 
   const label = data
     ? granularity === 'week'
-      ? `Week of ${formatDate(data.periodStart)}`
+      ? formatWeekRange(data.periodStart, data.periodEnd)
       : new Intl.DateTimeFormat('en-IN', { month: 'long', year: 'numeric', timeZone: 'Asia/Kolkata' }).format(
           new Date(data.periodStart),
         )
@@ -95,19 +95,22 @@ export function BudgetsView({ projectId, canEdit }: { projectId: string; canEdit
     <div className="space-y-4">
       <div className="flex flex-wrap items-center justify-between gap-3">
         <h1 className="font-display text-2xl font-bold">Budgets</h1>
-        <div className="flex items-center gap-2">
-          <Segmented
-            options={[
-              { value: 'week', label: 'Week' },
-              { value: 'month', label: 'Month' },
-            ]}
-            value={granularity}
-            onChange={(g) => setGranularity(g)}
-          />
+        {/* Full-width row on phones; the toggle never shrinks, the period label takes what's left. */}
+        <div className="flex w-full items-center gap-2 sm:w-auto">
+          <div className="shrink-0">
+            <Segmented
+              options={[
+                { value: 'week', label: 'Week' },
+                { value: 'month', label: 'Month' },
+              ]}
+              value={granularity}
+              onChange={(g) => setGranularity(g)}
+            />
+          </div>
           <IconButton label="Previous period" onClick={() => step(-1)}>
             <ChevronLeft size={18} />
           </IconButton>
-          <span className="min-w-28 text-center text-sm text-ink-2">{label}</span>
+          <span className="min-w-0 flex-1 truncate text-center text-sm text-ink-2 sm:min-w-28 sm:flex-none">{label}</span>
           <IconButton label="Next period" onClick={() => step(1)}>
             <ChevronRight size={18} />
           </IconButton>
@@ -130,9 +133,16 @@ export function BudgetsView({ projectId, canEdit }: { projectId: string; canEdit
                   </span>
                   {r.status && <StatusBadge status={r.status} />}
                 </div>
-                <p className="num mt-1 text-sm text-ink-2">
-                  {formatINR(r.actual)}
-                  {r.planned > 0 ? ` of ${formatINR(r.planned)}` : ' · no budget'}
+                <p className="num mt-1 flex flex-wrap items-baseline justify-between gap-x-3 text-sm text-ink-2">
+                  <span>
+                    {formatINR(r.actual)}
+                    {r.planned > 0 ? ` of ${formatINR(r.planned)}` : ' · no budget'}
+                  </span>
+                  {r.planned > 0 && (
+                    <span className={r.variance < 0 ? 'font-semibold text-danger' : 'text-ink-3'}>
+                      {r.variance < 0 ? `${formatINR(-r.variance)} over` : `${formatINR(r.variance)} left`}
+                    </span>
+                  )}
                 </p>
                 {r.planned > 0 && (
                   <div className="mt-2">

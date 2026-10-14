@@ -57,6 +57,16 @@ export default async function ProjectsPage() {
     }),
   );
 
+  // Ongoing work first: active → paused → completed, then most recent activity.
+  const STATUS_ORDER: Record<string, number> = { active: 0, paused: 1, completed: 2 };
+  const sorted = [...memberships].sort((a, b) => {
+    const s = (STATUS_ORDER[a.project.status] ?? 3) - (STATUS_ORDER[b.project.status] ?? 3);
+    if (s !== 0) return s;
+    const la = stats.get(a.project.id)?.last?.getTime() ?? 0;
+    const lb = stats.get(b.project.id)?.last?.getTime() ?? 0;
+    return lb - la;
+  });
+
   return (
     <main className="mx-auto max-w-[1200px] p-4 sm:p-6">
       <header className="flex items-center justify-between gap-3">
@@ -79,7 +89,7 @@ export default async function ProjectsPage() {
             <EmptyState title="No projects yet — create your first one." action={<NewProjectForm />} />
           </div>
         ) : (
-          memberships.map((m) => {
+          sorted.map((m) => {
             const st = stats.get(m.project.id);
             return (
               <Link
@@ -87,9 +97,11 @@ export default async function ProjectsPage() {
                 href={`/projects/${m.project.id}`}
                 className="block min-h-11 min-w-0 rounded-lg border border-border bg-surface p-4 transition hover:border-border-strong hover:shadow-e1"
               >
-                <div className="flex items-center justify-between gap-2">
-                  <span className="min-w-0 truncate font-display text-lg font-semibold">{m.project.name}</span>
-                  <span className="flex shrink-0 items-center gap-2">
+                <div className="flex items-start justify-between gap-2">
+                  <span className="min-w-0 font-display text-lg font-semibold leading-snug line-clamp-2 break-words">
+                    {m.project.name}
+                  </span>
+                  <span className="mt-0.5 flex shrink-0 items-center gap-2">
                     <span className="rounded-full bg-surface-2 px-2 py-0.5 text-xs text-ink-2">{ROLE_LABEL[m.role] ?? m.role}</span>
                     <span className={`rounded-full px-2 py-0.5 text-xs font-medium ${STATUS_CLASS[m.project.status] ?? 'bg-surface-2 text-ink-2'}`}>
                       {STATUS_LABEL[m.project.status] ?? m.project.status}
