@@ -1,12 +1,13 @@
 'use client';
 
 import { useCallback, useEffect, useState } from 'react';
-import { Check, Pencil, Plus } from 'lucide-react';
+import { Archive, ArchiveRestore, Check, ChevronDown, Pencil, Plus, Save } from 'lucide-react';
 import { api } from '@/lib/api-client';
 import { Button } from '@/components/ui/Button';
 import { Alert } from '@/components/ui/Alert';
 import { Field, Select, TextInput, Textarea, DateInput } from '@/components/ui/inputs';
 import { useToast } from '@/components/ui/Toast';
+import { todayIST } from '@/lib/period';
 
 type Project = {
   id: string;
@@ -32,7 +33,7 @@ export function SettingsView({ projectId, initialProject }: { projectId: string;
   const [project, setProject] = useState(initialProject);
   const [name, setName] = useState(initialProject.name);
   const [description, setDescription] = useState(initialProject.description ?? '');
-  const [startDate, setStartDate] = useState(initialProject.startDate.slice(0, 10));
+  const [startDate, setStartDate] = useState(todayIST(new Date(initialProject.startDate)));
   const [status, setStatus] = useState(initialProject.status);
   const [savingProject, setSavingProject] = useState(false);
 
@@ -70,7 +71,7 @@ export function SettingsView({ projectId, initialProject }: { projectId: string;
       const res = await api.patch<{ project: Project }>(`/api/projects/${projectId}`, {
         name,
         description: description || null,
-        startDate: new Date(startDate).toISOString(),
+        startDate, // bare YYYY-MM-DD: the server reads it as an IST calendar date
         status,
         version: project.version,
       });
@@ -157,7 +158,7 @@ export function SettingsView({ projectId, initialProject }: { projectId: string;
           </Field>
         </div>
         <Button type="submit" loading={savingProject}>
-          Save project
+          {!savingProject && <Save size={16} aria-hidden />} Save project
         </Button>
       </form>
 
@@ -221,7 +222,7 @@ export function SettingsView({ projectId, initialProject }: { projectId: string;
                   <Pencil size={15} aria-hidden /> Rename
                 </Button>
                 <Button variant="ghost" aria-label={`Deactivate ${c.name}`} onClick={() => toggleCategory(c)}>
-                  Deactivate
+                  <Archive size={15} aria-hidden /> Deactivate
                 </Button>
               </span>
             </li>
@@ -234,8 +235,9 @@ export function SettingsView({ projectId, initialProject }: { projectId: string;
               type="button"
               onClick={() => setShowInactive((v) => !v)}
               aria-expanded={showInactive}
-              className="min-h-11 text-sm text-ink-3 hover:text-ink"
+              className="inline-flex min-h-11 items-center gap-1 text-sm text-ink-3 hover:text-ink"
             >
+              <ChevronDown size={16} aria-hidden className={`transition-transform ${showInactive ? 'rotate-180' : ''}`} />
               {showInactive ? 'Hide' : 'Show'} inactive ({inactive.length})
             </button>
             {showInactive && (
@@ -246,7 +248,7 @@ export function SettingsView({ projectId, initialProject }: { projectId: string;
                       {c.name} <span className="text-xs">({TYPE_LABEL[c.type] ?? c.type})</span>
                     </span>
                     <Button variant="ghost" aria-label={`Activate ${c.name}`} onClick={() => toggleCategory(c)}>
-                      Activate
+                      <ArchiveRestore size={15} aria-hidden /> Activate
                     </Button>
                   </li>
                 ))}

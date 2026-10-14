@@ -21,8 +21,10 @@ neon env pull --file .env.dev       # get the dev branch's DATABASE_URL/DIRECT_U
 ```
 Record which branch each `DATABASE_URL`/Auth URL belongs to. **Never** give preview builds production
 credentials. Apply the schema to a new branch with `prisma migrate deploy`.
-> Current state: local dev points at the default (production) branch. Move to a `dev` branch before
-> storing real records.
+> Current state: a `dev` branch exists (project `dawn-water-04358720`, branch `dev`, its own Neon Auth
+> with localhost allowed) and is used for the authed e2e suite. Local `.env` still points at the
+> production branch: switch it to `dev` with `neon connection-string dev [--pooled]` before
+> storing real records locally.
 
 ## 2. Release process (migrations)
 Prisma migrations are forward-only and applied outside request handlers.

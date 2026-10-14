@@ -25,6 +25,14 @@ test.describe('login page', () => {
     await expect(page.getByRole('button', { name: 'Email me a sign-in link' })).toHaveCount(0);
   });
 
+  test('Google buttons show the Google logo; magic link shows a mail icon', async ({ page }) => {
+    const google = page.getByRole('button', { name: 'Sign in with Google' });
+    await expect(google.locator('svg path')).toHaveCount(4); // the four-colour "G"
+    await expect(page.getByRole('button', { name: 'Email me a sign-in link' }).locator('svg')).toHaveCount(1);
+    await page.getByRole('tab', { name: 'Sign up' }).click();
+    await expect(page.getByRole('button', { name: 'Sign up with Google' }).locator('svg path')).toHaveCount(4);
+  });
+
   test('magic link asks for an email first (no network call)', async ({ page }) => {
     await page.getByRole('button', { name: 'Email me a sign-in link' }).click();
     await expect(page.getByText('Enter your email first')).toBeVisible();

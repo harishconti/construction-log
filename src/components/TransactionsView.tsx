@@ -1,9 +1,22 @@
 'use client';
 
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
-import { FileText, Pencil, Plus, Receipt, RotateCcw, Search, SlidersHorizontal, Trash2, X } from 'lucide-react';
+import {
+  ChevronLeft,
+  ChevronRight,
+  FileText,
+  FunnelX,
+  Pencil,
+  Plus,
+  Receipt,
+  RotateCcw,
+  Search,
+  SlidersHorizontal,
+  Trash2,
+  X,
+} from 'lucide-react';
 import { api, newIdempotencyKey } from '@/lib/api-client';
-import { todayIST } from '@/lib/period';
+import { istDateToInstant, istDayEnd, todayIST } from '@/lib/period';
 import { formatDate, formatDayLabel, formatINR } from '@/lib/format';
 import { AttachmentList, isImage, type AttachmentItem } from '@/components/AttachmentList';
 import { UploadPicker, useUploads } from '@/components/UploadPicker';
@@ -102,8 +115,8 @@ export function TransactionsView({ projectId, role }: { projectId: string; role:
       if (categoryId) qs.set('categoryId', categoryId);
       if (paymentMode) qs.set('paymentMode', paymentMode);
       if (vendor) qs.set('vendor', vendor);
-      if (from) qs.set('from', new Date(from).toISOString());
-      if (to) qs.set('to', new Date(`${to}T23:59:59`).toISOString());
+      if (from) qs.set('from', istDateToInstant(from).toISOString());
+      if (to) qs.set('to', istDayEnd(to).toISOString());
 
       const [txRes, catRes] = await Promise.all([
         api.get<{ items: Transaction[]; pagination: Page }>(
@@ -358,8 +371,8 @@ export function TransactionsView({ projectId, role }: { projectId: string; role:
           {paymentMode && <FilterChip label={PAYMENT_LABEL[paymentMode] ?? paymentMode} onClear={() => { setPage(1); setPaymentMode(''); }} />}
           {from && <FilterChip label={`From ${formatDate(from)}`} onClear={() => { setPage(1); setFrom(''); }} />}
           {to && <FilterChip label={`To ${formatDate(to)}`} onClear={() => { setPage(1); setTo(''); }} />}
-          <button type="button" onClick={resetFilters} className="min-h-11 px-2 text-sm text-ink-2 hover:text-ink">
-            Clear all
+          <button type="button" onClick={resetFilters} className="inline-flex min-h-11 items-center gap-1 px-2 text-sm text-ink-2 hover:text-ink">
+            <X size={14} aria-hidden /> Clear all
           </button>
         </div>
       )}
@@ -379,7 +392,7 @@ export function TransactionsView({ projectId, role }: { projectId: string; role:
           action={
             filtered ? (
               <Button variant="secondary" onClick={resetFilters}>
-                Clear filters
+                <FunnelX size={16} aria-hidden /> Clear filters
               </Button>
             ) : canEdit ? (
               <Button onClick={() => setSheet({ open: true, entry: null })}>
@@ -516,13 +529,13 @@ export function TransactionsView({ projectId, role }: { projectId: string; role:
       {pagination && pagination.pages > 1 && (
         <div className="flex items-center justify-center gap-3 text-sm">
           <Button variant="secondary" disabled={page <= 1} onClick={() => setPage((p) => p - 1)}>
-            ‹ Prev
+            <ChevronLeft size={16} aria-hidden /> Prev
           </Button>
           <span className="num text-ink-2">
             {pagination.page} / {pagination.pages}
           </span>
           <Button variant="secondary" disabled={page >= pagination.pages} onClick={() => setPage((p) => p + 1)}>
-            Next ›
+            Next <ChevronRight size={16} aria-hidden />
           </Button>
         </div>
       )}
@@ -710,7 +723,7 @@ function TransactionSheet({
   onMessage: (message: string) => void;
 }) {
   const [categoryId, setCategoryId] = useState(entry?.category.id ?? '');
-  const [occurredAt, setOccurredAt] = useState(() => (entry ? entry.occurredAt.slice(0, 10) : todayIST()));
+  const [occurredAt, setOccurredAt] = useState(() => (entry ? todayIST(new Date(entry.occurredAt)) : todayIST()));
   const [amount, setAmount] = useState(entry ? Number(entry.amount).toString() : '');
   const [gstAmount, setGstAmount] = useState(entry ? Number(entry.gstAmount).toString() : '');
   const [vendor, setVendor] = useState(entry?.vendor ?? '');
@@ -747,7 +760,7 @@ function TransactionSheet({
       if (entry) {
         await api.patch(`/api/projects/${projectId}/transactions/${entry.id}`, {
           categoryId: selectedCategoryId,
-          occurredAt: new Date(occurredAt).toISOString(),
+          occurredAt, // bare YYYY-MM-DD: the server reads it as an IST calendar date
           amount: Number(amount),
           gstAmount: Number(gstAmount || 0),
           vendor: vendor || null,
@@ -763,7 +776,7 @@ function TransactionSheet({
           `/api/projects/${projectId}/transactions`,
           {
             categoryId: selectedCategoryId,
-            occurredAt: new Date(occurredAt).toISOString(),
+            occurredAt,
             amount: Number(amount),
             gstAmount: Number(gstAmount || 0),
             vendor: vendor || null,

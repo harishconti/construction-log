@@ -1,6 +1,6 @@
 import { NextResponse } from 'next/server';
 import { Prisma } from '@prisma/client';
-import { ZodError, type ZodSchema } from 'zod';
+import { ZodError, type ZodType, type ZodTypeDef } from 'zod';
 
 export type ApiErrorBody = { error: string; code: string };
 
@@ -47,6 +47,13 @@ export function errorResponse(err: unknown): NextResponse<ApiErrorBody> {
     if (err.code === 'P2025') {
       return NextResponse.json({ error: 'Not found', code: 'NOT_FOUND' }, { status: 404 });
     }
+    if (err.code === 'P2028') {
+      // Interactive transaction expired and was rolled back: nothing was written, so a retry is safe.
+      return NextResponse.json(
+        { error: 'The database was slow to respond, please retry', code: 'TRANSACTION_TIMEOUT' },
+        { status: 503 },
+      );
+    }
     if (err.code === 'P2034') {
       return NextResponse.json(
         { error: 'Conflicting write, please retry', code: 'WRITE_CONFLICT' },
@@ -87,7 +94,8 @@ export function handle<Ctx = unknown>(fn: Handler<Ctx>): Handler<Ctx> {
   };
 }
 
-export async function parseJson<T>(req: Request, schema: ZodSchema<T>): Promise<T> {
+// Input is `unknown`: T must come from the schema's *output* (e.g. a date string transformed to Date).
+export async function parseJson<T>(req: Request, schema: ZodType<T, ZodTypeDef, unknown>): Promise<T> {
   let raw: unknown;
   try {
     raw = await req.json();

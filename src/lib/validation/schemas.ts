@@ -1,6 +1,7 @@
 import { z } from 'zod';
 import { isAllowedMime, sizeLimitFor } from '../files';
 import { ROLES } from '../roles';
+import { CALENDAR_DATE, istDateToInstant } from '../period';
 
 export const paymentModeSchema = z.enum(['cash', 'upi', 'bank', 'card', 'credit']);
 export const categoryTypeSchema = z.enum(['material', 'labour', 'tax', 'utility', 'misc']);
@@ -9,6 +10,21 @@ export const projectStatusSchema = z.enum(['active', 'paused', 'completed']);
 export const parentTypeSchema = z.enum(['transaction', 'diary_entry']);
 
 const FUTURE_TOLERANCE_MS = 60_000;
+
+/**
+ * A date input. Bare `YYYY-MM-DD` values are IST calendar dates (00:00 Asia/Kolkata); full ISO
+ * timestamps pass through unchanged. `z.coerce.date()` would read `YYYY-MM-DD` as UTC midnight
+ * (05:30 IST, so "today" is still in the future just after midnight IST) and would roll impossible
+ * dates like 2026-02-30 over into March.
+ */
+const dateInput = z.union([z.string(), z.number(), z.date()]).transform((v, ctx) => {
+  const d = typeof v === 'string' && CALENDAR_DATE.test(v) ? istDateToInstant(v) : new Date(v);
+  if (Number.isNaN(d.getTime())) {
+    ctx.addIssue({ code: z.ZodIssueCode.invalid_date, message: 'Invalid date' });
+    return z.NEVER;
+  }
+  return d;
+});
 
 // Money guardrails: fits Decimal(12,2) and at most two decimal places.
 const MAX_MONEY = 9_999_999_999.99;
@@ -23,14 +39,14 @@ const moneyNonNegative = z.number().min(0).max(MAX_MONEY).refine(twoDecimals, 'A
 export const createProjectSchema = z.object({
   name: z.string().trim().min(1).max(200),
   description: z.string().trim().max(2000).optional().nullable(),
-  startDate: z.coerce.date(),
+  startDate: dateInput,
   status: projectStatusSchema.optional(),
 });
 
 export const updateProjectSchema = z.object({
   name: z.string().trim().min(1).max(200).optional(),
   description: z.string().trim().max(2000).optional().nullable(),
-  startDate: z.coerce.date().optional(),
+  startDate: dateInput.optional(),
   status: projectStatusSchema.optional(),
   version: z.number().int().min(0).optional(),
 });
@@ -66,7 +82,7 @@ export const updateCategorySchema = z.object({
 export const createTransactionSchema = z
   .object({
     categoryId: z.string().min(1),
-    occurredAt: z.coerce.date(),
+    occurredAt: dateInput,
     amount: moneyPositive,
     gstAmount: moneyNonNegative.default(0),
     vendor: z.string().trim().max(200).optional().nullable(),
@@ -94,7 +110,7 @@ export const createTransactionSchema = z
 export const updateTransactionSchema = z
   .object({
     categoryId: z.string().min(1).optional(),
-    occurredAt: z.coerce.date().optional(),
+    occurredAt: dateInput.optional(),
     amount: moneyPositive.optional(),
     gstAmount: moneyNonNegative.optional(),
     vendor: z.string().trim().max(200).optional().nullable(),
@@ -124,14 +140,14 @@ export const updateTransactionSchema = z
 // ---------------------------------------------------------------------------
 
 export const createDiarySchema = z.object({
-  entryDate: z.coerce.date(),
+  entryDate: dateInput,
   title: z.string().trim().min(1).max(200),
   body: z.string().trim().max(20000),
   attachmentIds: z.array(z.string().min(1)).max(10).optional(),
 });
 
 export const updateDiarySchema = z.object({
-  entryDate: z.coerce.date().optional(),
+  entryDate: dateInput.optional(),
   title: z.string().trim().min(1).max(200).optional(),
   body: z.string().trim().max(20000).optional(),
   version: z.number().int().min(0).optional(),
@@ -144,7 +160,7 @@ export const updateDiarySchema = z.object({
 export const createBudgetSchema = z.object({
   categoryId: z.string().min(1),
   periodType: z.enum(['week', 'month']),
-  periodStart: z.coerce.date(),
+  periodStart: dateInput,
   plannedAmount: moneyNonNegative,
   note: z.string().trim().max(500).optional().nullable(),
 });
