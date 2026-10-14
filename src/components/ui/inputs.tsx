@@ -149,20 +149,56 @@ export function Segmented<T extends string>({
   onChange: (v: T) => void;
 }) {
   const ctx = useContext(FieldContext);
+  const selectedIndex = options.findIndex((o) => o.value === value);
+
+  const handleKeyDown = (e: React.KeyboardEvent<HTMLButtonElement>, index: number) => {
+    let nextIndex = -1;
+    if (e.key === 'ArrowRight' || e.key === 'ArrowDown') {
+      nextIndex = (index + 1) % options.length;
+    } else if (e.key === 'ArrowLeft' || e.key === 'ArrowUp') {
+      nextIndex = (index - 1 + options.length) % options.length;
+    } else if (e.key === 'Home') {
+      nextIndex = 0;
+    } else if (e.key === 'End') {
+      nextIndex = options.length - 1;
+    }
+
+    if (nextIndex !== -1) {
+      e.preventDefault();
+      const nextOption = options[nextIndex];
+      if (nextOption) {
+        onChange(nextOption.value);
+        const container = e.currentTarget.parentElement;
+        if (container) {
+          const buttons = container.querySelectorAll<HTMLButtonElement>('[role="radio"]');
+          buttons[nextIndex]?.focus();
+        }
+      }
+    }
+  };
+
   return (
     <div role="radiogroup" aria-labelledby={ctx?.labelId} className="inline-flex flex-wrap rounded-md bg-surface-2 p-1 text-sm">
-      {options.map((o) => (
-        <button
-          key={o.value}
-          type="button"
-          role="radio"
-          aria-checked={value === o.value}
-          onClick={() => onChange(o.value)}
-          className={`min-h-11 rounded px-3 ${value === o.value ? 'bg-surface font-semibold text-ink shadow-e1' : 'text-ink-2'}`}
-        >
-          {o.label}
-        </button>
-      ))}
+      {options.map((o, index) => {
+        const isSelected = value === o.value;
+        const tabIndex = isSelected || (selectedIndex === -1 && index === 0) ? 0 : -1;
+        return (
+          <button
+            key={o.value}
+            type="button"
+            role="radio"
+            aria-checked={isSelected}
+            tabIndex={tabIndex}
+            onClick={() => onChange(o.value)}
+            onKeyDown={(e) => handleKeyDown(e, index)}
+            className={`min-h-11 rounded px-3 ${
+              isSelected ? 'bg-surface font-semibold text-ink shadow-e1' : 'text-ink-2'
+            }`}
+          >
+            {o.label}
+          </button>
+        );
+      })}
     </div>
   );
 }
