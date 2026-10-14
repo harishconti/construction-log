@@ -25,3 +25,8 @@ coverage
 # Prisma
 prisma/*.db
 prisma/*.db-journal
+
+# Playwright
+/test-results/
+/playwright-report/
+/e2e/.auth/

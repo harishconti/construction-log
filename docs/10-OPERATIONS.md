@@ -82,5 +82,5 @@ Use this if the ledger grows beyond the initial admin:
 
 ## 6. Optional hardening (not implemented)
 - Malware/AV scan hook on finalize.
-- Magic-byte content sniffing to reject mismatched file types (defence in depth).
+- ~~Magic-byte content sniffing~~: done in A3 (`sniffMatches` in `src/lib/files.ts`, checked at finalize).
 - Separate restricted runtime vs migration DB credentials.

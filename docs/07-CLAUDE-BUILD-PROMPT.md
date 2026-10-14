@@ -7,7 +7,7 @@ diary entries, and budgets for a personal house-construction project in India.
 > Read current official Neon Auth Next.js documentation and use supported APIs for the installed SDK.
 
 ## Tech Stack (use exactly this)
-- Next.js (App Router), TypeScript, React 18, Tailwind CSS
+- Next.js (App Router), TypeScript, React 19, Tailwind CSS
 - Prisma ORM + **Neon PostgreSQL** (pooled `DATABASE_URL`; `DIRECT_URL` for migrations)
 - Auth: **Neon Auth** (Managed Better Auth) via `@neondatabase/auth`; httpOnly session cookies — no
   custom JWT, no `bcrypt`, no password storage

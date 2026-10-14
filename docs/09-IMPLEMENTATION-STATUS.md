@@ -4,15 +4,15 @@ Last updated: 14 October 2026 · Stack: Next.js 16 · Prisma · Neon Postgres ·
 This document reflects the **actual repository state**. For the target design see 00–08.
 
 ## Runtime / stack (as built)
-- **Next.js 16.4** (App Router, Turbopack), TypeScript strict, React 18, Tailwind CSS.
+- **Next.js 16.4** (App Router, Turbopack), TypeScript strict, React 19, Tailwind CSS, Recharts 3, Vitest 5.
 - **Prisma** with pooled `DATABASE_URL` + direct `DIRECT_URL` (`directUrl`); schema managed via `prisma/migrations`.
 - **Neon Auth** (Managed Better Auth) via `@neondatabase/auth`; session cookies; users mirrored locally.
 - **Cloudflare R2** private bucket, presigned PUT/GET, two-phase upload.
 - **Vercel** target; `build` runs `prisma generate && next build`; Node `22.x`; daily cleanup cron (`vercel.json`).
 
 ## Data model (implemented)
-`User, Project, ProjectMember, Category, Transaction, DiaryEntry, Attachment, Budget, BudgetRevision,
-AuditLog, IdempotencyKey, ObjectDeletion`.
+`User, Project, ProjectMember, Invitation, Category, Transaction, DiaryEntry, Attachment, Budget, BudgetRevision,
+AuditLog, IdempotencyKey, ObjectDeletion, RateLimit`.
 
 Key properties in place:
 - `User.id` = Neon Auth user id (no stored password).
@@ -23,7 +23,7 @@ Key properties in place:
 - `ObjectDeletion` retry queue for deferred R2 deletions.
 
 Migrations: `init`, `attachment_parent_check`, `idempotency_response`, `object_deletion_queue`,
-`attachment_original_name`, `invitations`, `invitation_expiry`.
+`attachment_original_name`, `invitations`, `invitation_expiry`, `rate_limit`, `enum_checks`.
 
 ## API endpoints (implemented)
 | Area | Endpoints |
@@ -52,7 +52,7 @@ PWA: `manifest.json` + service worker (`public/sw.js`, registered in production)
 ## Behaviour implemented
 - **Auth**: Neon Auth sign-up/in via same-origin proxy; server `getSession`; user mirror upsert.
 - **Authorization**: `requireRole(projectId, userId, minRole)` on every route; project isolation via `projectId` scoping; last-admin safeguard; editor-any transaction edits (admin-only delete/restore); diary author/admin edits, admin delete. The project creator is its first admin. Admins can invite by email before the invitee has an account (pending `Invitation` claimed automatically on first sign-in).
-- **Uploads**: presign → browser PUT direct to R2 → finalize (HeadObject verifies existence/size,
+- **Uploads**: presign → browser PUT direct to R2 → finalize (HeadObject verifies existence/size, magic bytes must match the declared type,
   re-checks the size cap) → link on create. Images render inline via signed GET; **all other types are
   download-only** through `GET /api/attachments/:id/download` (`octet-stream`, `attachment`, `nosniff`).
   Type allowlist (jpeg/png/webp/gif inline; pdf/txt/csv/xls/xlsx/heic/heif download-only), 10 MB per
@@ -63,8 +63,15 @@ PWA: `manifest.json` + service worker (`public/sw.js`, registered in production)
 - **Maintenance**: reaps `pending` uploads older than 24h and retries deferred R2 deletions (attempt cap + TTL).
 
 ## Verification
-- `npm run typecheck`, `npm run lint`, `npm test` (**40 unit tests**: roles, validation, period/budget
-  math, maintenance auth, file policy), `npm run build` — all green.
+- `npm run typecheck`, `npm run lint`, `npm test` (**97 unit tests**: roles, validation, period/budget
+  math, maintenance auth, file policy, audit regressions, API error mapping/pagination, API client,
+  INR/IST formatting, and server guards — `requireRole`, rate limit, audit write, idempotency,
+  attachment linking — with Prisma mocked), `npm run build` — all green.
+- **Playwright e2e** (`npm run test:e2e`, runs in CI): public tier on desktop + Pixel 7 — login UI,
+  axe WCAG A/AA in light and dark, auth redirects, every API route → 401, maintenance secret, health
+  shape, security headers/CSP, PWA manifest/icons, service worker (84 tests, all passing). Authed tier
+  (`e2e/authed/`, project/expense/diary flows, version conflict, idempotency, GST rule) is opt-in via
+  `E2E_ALLOW_WRITES=1` and must target a non-production Neon branch.
 - Manual e2e against a real Neon project + R2 bucket: auth sign-up/session; project/category/transaction/
   diary/budget CRUD; optimistic-lock 409; idempotent replay; two-phase upload (PUT→finalize→link);
   attachment delete; budgets variance + revision history; timeline merge; dashboard totals; cleanup
@@ -154,7 +161,7 @@ future consideration).
    bucket/credentials, and a documented Neon Auth recovery step.
 5. **Dev/prod isolation**: local dev currently targets the default (production) Neon branch — create a
    `dev` branch (needs Neon CLI auth; procedure in `10-OPERATIONS.md`).
-6. **Optional hardening**: malware/AV scanning on finalize; magic-byte content sniffing to reject mismatched types (defence in depth).
+6. **Optional hardening**: malware/AV scanning on finalize; separate restricted runtime vs migration DB credentials. (Magic-byte sniffing shipped in A3.)
 
 ## Environment variables
 `DATABASE_URL`, `DIRECT_URL`, `NEON_AUTH_BASE_URL`, `NEON_AUTH_COOKIE_SECRET`, `NEXT_PUBLIC_APP_URL`
