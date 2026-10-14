@@ -10,6 +10,10 @@ canvas on claude.ai.
 Severity: **High** blocks usability or accessibility, so fix first · **Medium** clear UX debt ·
 **Low** polish.
 
+> **Implementation status:** reviewed against `develop` at `59f00cd` (commits B1–B6). See
+> [§7 Implementation review](#7-implementation-review) for what is done, what remains, and what was
+> implemented incorrectly.
+
 ---
 
 ## 1. Summary
@@ -465,3 +469,145 @@ categories go into a collapsed "Inactive" group instead of being struck through.
 - [ ] Dark mode renders every screen with tokens only (no `slate-*` / `white` left in components).
 - [ ] All amounts use `formatINR` + tabular numerals; all dates use `formatDate` in Asia/Kolkata.
 - [ ] No `window.confirm` / `window.prompt` / emoji left in `src/`.
+
+---
+
+## 7. Implementation review
+
+Reviewed 14 October 2026 against `develop` at `59f00cd`. The design commits B1–B6 cover tokens,
+fonts, formatters, the app shell, UI primitives, the Transactions rebuild, Dashboard/Budgets and PWA
+icons. This review comes from reading the code; nothing was rendered, so items marked *likely* should be
+confirmed in a browser.
+
+**Overall:** 13 findings are done, 10 are partly done, 1 is not started, and 4 have the wrong
+implementation. The foundation (tokens, fonts, `formatINR`/`formatDate`, `Sheet`, `ConfirmDialog`,
+`Toast`, `StatusBadge`) is solid. Most of what remains comes from two files that were never migrated
+(`TimelineView.tsx`, `AttachmentList.tsx`) and one bug in the shared `Field` component.
+
+### 7.1 Status by finding
+
+| # | Finding | Status | Notes |
+|---|---------|--------|-------|
+| 1 | Nav active state | ✅ Done | `NavLink` sets `aria-current` and a tint in the sidebar. The bottom bar has no active pill, only a colour change. |
+| 2 | Touch targets | 🟡 Partial | `Button`/`IconButton` are 44 px. Still too small: see §7.3. |
+| 3 | Mobile input size / keypad | ✅ Done | `text-base md:text-sm`, `inputMode="decimal"`. Timeline inputs are still 14 px. |
+| 4 | Sheet / drawer forms | ✅ Done | Used for expenses, diary, budget revision, filters and new project. |
+| 5 | Focus ring | ✅ Done | Global `:focus-visible` rule; `outline-none` removed from controls. |
+| 6 | Labels | ❌ Wrong | `Field` renders a `<label>` with no `htmlFor`, and no caller passes one or gives the control an `id`. **No form label in the app is linked to its input.** See §7.2-A. |
+| 7 | Contrast | 🟡 Partial | Tokens pass. Deleted expense rows still use `opacity-70`; `AttachmentList` still uses `text-slate-400`; the Deleted badge is 11 px. |
+| 8 | Native dialogs | ✅ Done | No `window.confirm`/`prompt` left. Soft delete has no "Undo" toast. |
+| 9 | Breakpoints / max width | 🟡 Partial | Content capped at 1200 px. The sidebar still appears at `sm` (640 px); there is no `md` icon rail. Bottom padding bug: §7.2-E. |
+| 10 | Bottom bar | 🟡 Partial | Icons and safe-area inset are done. Labels are 11 px (spec: at least 12); no active pill; the mobile top bar is not sticky and has no project switcher. |
+| 11 | Primary action / FAB | ❌ Wrong | The FAB is correct, but the header "Add" and the empty-state "Add" buttons ignore the role, so viewers see them (§7.2-B). |
+| 12 | Money formatting | 🟡 Partial | `formatINR` and `.num` everywhere except Timeline. Rows do not show "incl. ₹x GST". |
+| 13 | Dates / day grouping | 🟡 Partial | Expenses are grouped by day with totals. Timeline still uses `toLocaleDateString()`. The Budgets period anchor uses the UTC date (`toISOString`), so between 00:00 and 05:30 IST on the 1st or on a Monday it opens the previous period. |
+| 14 | Status not by colour alone | ✅ Done | `StatusBadge` (icon + word) and `ProgressBar` are used in Dashboard and Budgets. |
+| 15 | Budgets on phones | ✅ Done | Cards below `md`, table at `md+`. *Likely:* the header controls row (`Segmented`, arrows, `min-w-28` label) doesn't wrap and overflows at 360–390 px. |
+| 16 | Mobile filters | ✅ Done | Filter sheet + removable chips. No search field; the chip × button has no hit area. |
+| 17 | Loading / error / success | 🟡 Partial | `Alert` with Retry, skeletons and toasts are in. Members still shows "Loading…" text; Timeline unchanged; no Undo. |
+| 18 | Dashboard | 🟡 Partial | Hero card, stat sub-lines, horizontal bars and compact ₹ ticks are done. The chart is not themed for dark mode; the chart and the "By category" rows show the same data on mobile; recent items link to the list, not the item, and show no date. |
+| 19 | Typography | ✅ Done | Archivo + IBM Plex Sans via `next/font`; scale applied. Timeline `h1` is still `text-lg`. |
+| 20 | Tokens + dark mode | ❌ Wrong | Tokens are complete, but dark mode is broken in several places (§7.2-C). |
+| 21 | Lightbox | 🟡 Partial | Focus return, scroll lock, prev/next, caption and Esc/arrow keys are done. No focus trap, no swipe; buttons invisible in dark mode (§7.2-C). |
+| 22 | Timeline | ⬜ Not done | The component is unmigrated: slate/white classes, raw payment mode, `toLocaleDateString`, manual `₹`, plain error text, no type icon and no day grouping. (The emoji was removed.) |
+| 23 | Copy / labels | ✅ Done | Payment, role and category-type label maps; developer copy removed. Timeline still shows raw `upi`/`bank`. |
+| 24 | Empty states | ✅ Done | `EmptyState` with an action. On an empty Projects page, "New project" appears twice. |
+| 25 | Login | ✅ Done | `tablist`, Google first, magic link as a text button, `Alert` for errors. The tabs are 36 px and the Google button lost its logo. |
+| 26 | Uploads | 🟡 Partial | Camera/Upload buttons are in. No thumbnail preview, per-file progress or retry; expenses accept one file only. |
+| 27 | Project list | ❌ Wrong | The role and status pills were added, but the status pill is always green (`bg-ok-tint`), even for Paused and Completed. Spend and last activity are not shown. |
+| 28 | PWA icons | ✅ Done | PNG 192/512, maskable, apple-touch-icon, per-scheme `themeColor`. `manifest.theme_color` (#1f4fd1) does not match the meta theme colour (#f5f4f0). |
+
+### 7.2 Implemented incorrectly (fix first)
+
+**A. Form labels are not linked to their inputs (High, all forms).**
+`src/components/ui/inputs.tsx` → `Field` accepts `htmlFor`, but no caller passes it, and `TextInput`,
+`Select`, `DateInput` and `Textarea` get no `id`. `MoneyInput` creates its own `useId()` that `Field` never
+learns about. As a result, screen readers announce unlabeled fields and tapping a label does not focus
+the input.
+*Fix:* make `Field` generate the id (`useId`) and pass it down: either through a context the controls
+read, or by cloning the single child with `id`, `aria-invalid={!!error}` and
+`aria-describedby={hintId|errorId}`. Then delete the separate id in `MoneyInput`.
+
+**B. Viewers see "Add" buttons (Medium).**
+`TransactionsView.tsx` (header "Add" `hidden sm:inline-flex`, empty-state "Add expense") and
+`DiaryView.tsx` (header "Add entry", empty-state "Add entry") don't check `canEdit`/`canWrite`. Only
+the FAB does. A viewer can open the sheet, fill it in and get a 403 on save.
+*Fix:* wrap those buttons in the same role check as the FAB.
+
+**C. Dark mode is broken in several places (High).**
+- `TimelineView.tsx`: cards use `bg-white` while body text inherits `--ink` (#ECEDEF), so in dark mode
+  it shows light text on white and the page is unreadable.
+- `AttachmentList.tsx`: file chips use `bg-slate-50` with inherited light text, so they are unreadable.
+  The delete chip is `bg-white text-red-600`.
+- `ui/Lightbox.tsx`: Close/Prev/Next use `bg-white/80–90` with `text-ink`, so in dark mode the icons
+  are light on white and invisible.
+- `ui/Button.tsx` danger variant: `text-white` on dark `--danger` (#FF8A80) is about 2.3:1. Add an
+  `--on-danger` token (#FFFFFF in light, #2A0B08 in dark).
+- `DashboardChart.tsx`: Recharts' default tick (#666), grid and tooltip colours ignore the tokens.
+  Pass `tick={{ fill: 'var(--ink-2)' }}`, `stroke="var(--border)"`, and tooltip
+  `contentStyle={{ background: 'var(--surface)', borderColor: 'var(--border)' }}`.
+- `SignOutButton.tsx` still uses `text-slate-600 hover:bg-slate-100`.
+
+**D. The Expenses row menu is clipped and stays open (Medium).**
+In `TransactionsView.tsx`, each day's `<ul>` has `overflow-hidden`, so the absolutely positioned
+`<details>` menu on the last row(s) is cut off. The menu also doesn't close after "Edit" or on an
+outside click, and its items are about 36 px tall.
+*Fix:* remove `overflow-hidden` from the list (round the first and last rows instead), or render the
+menu in a portal. Close it on select or on an outside click, and make items `min-h-11`.
+
+**E. Desktop has extra bottom padding (Low).**
+In `projects/[id]/layout.tsx`, the content wrapper has `pb-20 sm:pb-0` and also an inline
+`style={{ paddingBottom: 'var(--bottom-nav-h)' }}`. The inline style wins, so desktop gets 56 px of
+padding for a bottom bar that isn't there.
+*Fix:* drop the inline style and use `pb-[var(--bottom-nav-h)] sm:pb-0` (switch the breakpoint to
+`md` along with item 9).
+
+**F. Project status pill colour (Low).** `projects/page.tsx` always uses `bg-ok-tint text-ok`.
+*Fix:* map Active → ok, Paused → warn, Completed → surface-2/ink-2.
+
+**G. Smaller correctness issues.**
+- `SettingsView.tsx`: the rename confirm `<Button>` holds only a `Check` icon and has no
+  `aria-label`.
+- `MoneyInput`: the comment promises "digit grouping on blur", but the code only rounds to 2 decimals.
+  The filter `/[^0-9.]/` also allows `1.2.3`.
+- `MembersView.tsx`: the role `Select` is forced to `!h-9` (36 px).
+- `Sheet` / `ConfirmDialog`: focus moves into the panel and returns on close, but Tab can move to the
+  page behind it. Add a focus trap (or use `<dialog>` with `showModal()`). `ConfirmDialog` has no
+  `aria-labelledby`.
+- `Alert` Retry is `h-8` (32 px); `Segmented` options and login tabs are `h-9` (36 px).
+
+### 7.3 Remaining work (not yet built)
+
+1. **Timeline:** migrate fully to tokens and primitives (`Field`/`DateInput`, `Alert`, `SkeletonRows`,
+   `EmptyState`, `formatINR`, `formatDayLabel`, `PAYMENT_LABEL`). Add a type tile (expense/diary) and
+   day groups. Use a `Button` for Load more.
+2. **AttachmentList:** token colours; a 32 px visible delete chip with a 44 px hit area; a file-type
+   icon on file chips.
+3. **Shell:** move the sidebar to `lg`, add a 72 px icon rail at `md`, make the mobile top bar sticky
+   with a project switcher, an active pill in the bottom bar, and 12 px labels.
+4. **Expenses on desktop:** a table at `md+` (date, vendor, category, paid by, bill, amount, ⋯) with a
+   filtered total in the footer; open the edit drawer on row click.
+5. **Expense rows:** vendor as the title, a leading bill thumbnail or icon tile, "incl. ₹x GST" in the
+   meta line, a Deleted badge at 12 px without fading the row.
+6. **Search:** a vendor/note search field next to Filters (debounced; it can reuse the `vendor` param).
+7. **Undo for soft delete:** give `Toast` an `action` and show "Expense deleted · Undo" (calls
+   restore).
+8. **Uploads:** thumbnail preview, per-file progress and retry, and multiple files for expenses (limit
+   10).
+9. **Diary:** day headers, a 3-up photo grid on desktop, and a Delete button in the edit sheet footer
+   instead of in each card.
+10. **Dashboard:** hide the chart below `md` (keep the progress rows), link recent items to the item,
+    and add dates to recent expenses.
+11. **Project cards:** total spend and last activity.
+12. **Members:** a skeleton instead of "Loading…".
+13. **Lightbox:** swipe gestures and a focus trap.
+
+### 7.4 Suggested next batch
+
+| Order | Items | Size |
+|---|---|---|
+| 1 | §7.2-A labels, §7.2-B role checks, §7.2-C dark-mode fixes, §7.2-D menu clipping | Small; mostly shared components |
+| 2 | §7.3-1 Timeline, §7.3-2 AttachmentList | Medium; the two unmigrated files |
+| 3 | §7.2-E/F/G and the touch-target leftovers | Small |
+| 4 | §7.3-3 shell (rail, sticky top bar), §7.3-4/5/6 Expenses desktop table and rows | Medium |
+| 5 | §7.3-7 Undo, §7.3-8 uploads, §7.3-9–13 polish | Medium |
