@@ -9,6 +9,7 @@ import {
   safeDownloadHeaders,
   sanitizeFilename,
   sizeLimitFor,
+  sniffMatches,
 } from '../src/lib/files';
 
 describe('file type allowlist', () => {
@@ -82,5 +83,26 @@ describe('safeDownloadHeaders', () => {
     expect(h['X-Content-Type-Options']).toBe('nosniff');
     expect(h['Cache-Control']).toBe('private, no-store');
     expect(h['Content-Length']).toBe('1234');
+  });
+});
+
+describe('sniffMatches', () => {
+  const b = (...hex: number[]) => Buffer.from(hex);
+
+  it('accepts correct magic bytes', () => {
+    expect(sniffMatches('image/jpeg', b(0xff, 0xd8, 0xff, 0xe0))).toBe(true);
+    expect(sniffMatches('image/png', b(0x89, 0x50, 0x4e, 0x47, 0x0d, 0x0a, 0x1a, 0x0a))).toBe(true);
+    expect(sniffMatches('application/pdf', Buffer.from('%PDF-1.7'))).toBe(true);
+    expect(sniffMatches('image/gif', Buffer.from('GIF89a'))).toBe(true);
+  });
+
+  it('rejects a mismatch (e.g. HTML declared as PNG)', () => {
+    expect(sniffMatches('image/png', Buffer.from('<html>'))).toBe(false);
+    expect(sniffMatches('application/pdf', Buffer.from('GIF89a'))).toBe(false);
+  });
+
+  it('treats text/spreadsheet types as matching (no signature)', () => {
+    expect(sniffMatches('text/plain', Buffer.from('hello'))).toBe(true);
+    expect(sniffMatches('text/csv', Buffer.from('a,b,c'))).toBe(true);
   });
 });

@@ -108,7 +108,7 @@ Cleanest is to reconnect Neon without a prefix. Otherwise, in Vercel → Environ
 ## 7. Scheduled maintenance
 - **Cleanup job**: `GET /api/maintenance/cleanup` reaps stale uploads (never-finalized `pending`, and
   finalized-but-unlinked `ready`, older than 24h), batch-deletes deferred R2 objects, and purges
-  idempotency keys older than 7 days. It is wired as a **daily Vercel Cron** in `vercel.json`
+  idempotency keys (7 days) and expired rate-limit windows. It is wired as a **daily Vercel Cron** in `vercel.json`
   (`0 3 * * *`). It authenticates with a shared secret: set `MAINTENANCE_SECRET`, or rely on Vercel
   Cron's `CRON_SECRET` (Vercel sends `Authorization: Bearer $CRON_SECRET`). With neither set, the
   endpoint denies (401). If the Hobby cron/runtime limits don't fit, call it from an external scheduler.

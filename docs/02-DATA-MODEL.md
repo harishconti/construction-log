@@ -234,6 +234,17 @@ model ObjectDeletion {
 
   @@index([createdAt])
 }
+
+/// Fixed-window rate-limit counters (one row per bucket per window).
+model RateLimit {
+  id          String   @id @default(cuid())
+  bucket      String
+  windowStart DateTime
+  count       Int      @default(0)
+
+  @@unique([bucket, windowStart])
+  @@index([windowStart])
+}
 ```
 
 ## Key Design Decisions
@@ -271,10 +282,13 @@ model ObjectDeletion {
 ## Implementation Status
 Implemented (migrations under `prisma/migrations`: `init`, `attachment_parent_check`,
 `idempotency_response`, `object_deletion_queue`, `attachment_original_name`, `invitations`,
-`invitation_expiry`): `User.id` = Neon Auth id with no `passwordHash`; `version` columns on
-Project/Transaction/DiaryEntry/Budget; `Attachment` with `transactionId`/`diaryEntryId`/`status`/`size`/
-`originalName`; the `attachment_parent_check` and `attachment_status_check` CHECK constraints;
-`IdempotencyKey` with a stored `response`; `ObjectDeletion` retry queue; `Invitation` (pre-signup
-invites, expiring). Prisma uses pooled `DATABASE_URL` + direct `DIRECT_URL`.
+`invitation_expiry`, `rate_limit`, `enum_checks`): `User.id` = Neon Auth id with no `passwordHash`;
+`version` columns on Project/Transaction/DiaryEntry/Budget; `Attachment` with
+`transactionId`/`diaryEntryId`/`status`/`size`/`originalName`; the `attachment_parent_check` and
+`attachment_status_check` CHECK constraints; `IdempotencyKey` with a stored `response`; `ObjectDeletion`
+retry queue; `Invitation` (pre-signup invites, expiring); `RateLimit` fixed-window counters. Enum-like
+columns (`Project.status`, `ProjectMember.role`, `Invitation.role`, `Transaction.paymentMode`,
+`Category.type`, `Budget.periodType`) also carry DB `CHECK` constraints. Prisma uses pooled
+`DATABASE_URL` + direct `DIRECT_URL`.
 
 Pending: `checksum` column population.

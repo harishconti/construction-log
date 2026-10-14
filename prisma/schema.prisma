@@ -246,3 +246,14 @@ model ObjectDeletion {
 
   @@index([createdAt])
 }
+
+/// Fixed-window rate-limit counters (one row per bucket per window).
+model RateLimit {
+  id          String   @id @default(cuid())
+  bucket      String
+  windowStart DateTime
+  count       Int      @default(0)
+
+  @@unique([bucket, windowStart])
+  @@index([windowStart])
+}

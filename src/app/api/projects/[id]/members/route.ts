@@ -2,6 +2,7 @@ import { ApiError, handle, json, parseJson } from '@/lib/api';
 import { requireUser } from '@/lib/auth';
 import { prisma } from '@/lib/prisma';
 import { requireRole } from '@/lib/requireRole';
+import { rateLimit, WINDOW } from '@/lib/ratelimit';
 import { writeAudit } from '@/lib/audit';
 import { invitationExpiry } from '@/lib/invitations';
 import { addMemberSchema } from '@/lib/validation/schemas';
@@ -37,6 +38,7 @@ export const POST = handle<Ctx>(async (req, { params: paramsPromise }) => {
   const params = await paramsPromise;
   const actor = await requireUser();
   await requireRole(params.id, actor.id, 'admin');
+  await rateLimit(`invite:${actor.id}`, 60, WINDOW.hour);
   const body = await parseJson(req, addMemberSchema);
 
   const invitee = await prisma.user.findUnique({ where: { email: body.email } });

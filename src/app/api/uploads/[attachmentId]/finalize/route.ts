@@ -3,9 +3,9 @@ import { requireUser } from '@/lib/auth';
 import { prisma } from '@/lib/prisma';
 import { requireRole } from '@/lib/requireRole';
 import { writeAudit } from '@/lib/audit';
-import { headObjectSize, isR2Configured } from '@/lib/r2';
+import { headObjectSize, isR2Configured, getObjectHeadBytes } from '@/lib/r2';
 import { serializeAttachment } from '@/lib/serialize';
-import { MAX_FILES_PER_RECORD, sizeLimitFor } from '@/lib/files';
+import { MAX_FILES_PER_RECORD, sizeLimitFor, sniffMatches } from '@/lib/files';
 import { finalizeAttachmentSchema } from '@/lib/validation/schemas';
 import type { Attachment } from '@prisma/client';
 
@@ -49,6 +49,15 @@ export const POST = handle<Ctx>(async (req, { params: paramsPromise }) => {
       data: { projectId: attachment.projectId, fileKey: attachment.fileKey, lastError: 'oversize upload' },
     });
     throw new ApiError(400, 'FILE_TOO_LARGE', `File exceeds the ${Math.round(limit / (1024 * 1024))} MB limit`);
+  }
+
+  // Defence in depth: verify the stored bytes match the declared type.
+  const head = await getObjectHeadBytes(attachment.fileKey);
+  if (!sniffMatches(attachment.mimeType, head)) {
+    await prisma.objectDeletion.create({
+      data: { projectId: attachment.projectId, fileKey: attachment.fileKey, lastError: 'content type mismatch' },
+    });
+    throw new ApiError(400, 'CONTENT_MISMATCH', 'File content does not match its declared type');
   }
 
   const updated = await prisma.$transaction(async (tx) => {

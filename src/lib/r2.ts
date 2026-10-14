@@ -92,6 +92,16 @@ export async function headObjectSize(fileKey: string): Promise<number | null> {
   }
 }
 
+/** Reads the first `length` bytes of an object (for content sniffing). */
+export async function getObjectHeadBytes(fileKey: string, length = 16): Promise<Buffer> {
+  const c = config();
+  const res = await s3().send(
+    new GetObjectCommand({ Bucket: c.bucket, Key: fileKey, Range: `bytes=0-${length - 1}` }),
+  );
+  const bytes = await res.Body!.transformToByteArray();
+  return Buffer.from(bytes);
+}
+
 export async function deleteObject(fileKey: string): Promise<void> {
   const c = config();
   await s3().send(new DeleteObjectCommand({ Bucket: c.bucket, Key: fileKey }));

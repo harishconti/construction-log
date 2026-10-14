@@ -1,6 +1,7 @@
 import { ApiError, handle, json } from '@/lib/api';
 import { prisma } from '@/lib/prisma';
 import { deleteObjects, isR2Configured } from '@/lib/r2';
+import { WINDOW } from '@/lib/ratelimit';
 import {
   DELETE_TTL_MS,
   IDEMPOTENCY_TTL_MS,
@@ -79,11 +80,17 @@ const run = handle(async (req) => {
     await prisma.idempotencyKey.deleteMany({ where: { createdAt: { lt: new Date(now - IDEMPOTENCY_TTL_MS) } } })
   ).count;
 
+  // 4) Purge expired rate-limit windows.
+  const purgedRateLimits = (
+    await prisma.rateLimit.deleteMany({ where: { windowStart: { lt: new Date(now - WINDOW.hour) } } })
+  ).count;
+
   return json({
     cleanedAttachments: stale.length,
     deletedObjects: deleted,
     failedDeletions: failed,
     purgedKeys,
+    purgedRateLimits,
     at: new Date().toISOString(),
   });
 });

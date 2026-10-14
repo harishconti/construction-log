@@ -57,6 +57,35 @@ export function extensionFor(mime: string): string {
   return EXT_BY_MIME[mime] ?? 'bin';
 }
 
+function startsWith(buf: Buffer, bytes: number[], offset = 0): boolean {
+  if (buf.length < offset + bytes.length) return false;
+  return bytes.every((b, i) => buf[offset + i] === b);
+}
+
+/**
+ * Defence-in-depth content sniffing: checks the file's magic bytes against its declared type.
+ * Text/spreadsheet types have no reliable signature and are treated as matching.
+ */
+export function sniffMatches(mime: string, bytes: Buffer): boolean {
+  switch (mime) {
+    case 'image/jpeg':
+      return startsWith(bytes, [0xff, 0xd8, 0xff]);
+    case 'image/png':
+      return startsWith(bytes, [0x89, 0x50, 0x4e, 0x47, 0x0d, 0x0a, 0x1a, 0x0a]);
+    case 'image/gif':
+      return startsWith(bytes, [0x47, 0x49, 0x46, 0x38]); // "GIF8"
+    case 'image/webp':
+      return startsWith(bytes, [0x52, 0x49, 0x46, 0x46]) && startsWith(bytes, [0x57, 0x45, 0x42, 0x50], 8);
+    case 'application/pdf':
+      return startsWith(bytes, [0x25, 0x50, 0x44, 0x46]); // "%PDF"
+    case 'image/heic':
+    case 'image/heif':
+      return startsWith(bytes, [0x66, 0x74, 0x79, 0x70], 4); // "ftyp"
+    default:
+      return true;
+  }
+}
+
 /** Strips directories, path separators, quotes and control characters; bounds length. */
 export function sanitizeFilename(name: string | null | undefined): string {
   const base = (name ?? '').split(/[/\\]/).pop() ?? '';

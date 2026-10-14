@@ -2,6 +2,7 @@ import { getPagination, handle, json, parseJson } from '@/lib/api';
 import { requireUser } from '@/lib/auth';
 import { prisma } from '@/lib/prisma';
 import { requireRole } from '@/lib/requireRole';
+import { rateLimit, WINDOW } from '@/lib/ratelimit';
 import { writeAudit } from '@/lib/audit';
 import { linkAttachments } from '@/lib/attachments';
 import { withIdempotency } from '@/lib/idempotency';
@@ -51,6 +52,7 @@ export const POST = handle<Ctx>(async (req, { params: paramsPromise }) => {
   const params = await paramsPromise;
   const user = await requireUser();
   await requireRole(params.id, user.id, 'editor');
+  await rateLimit(`diary:${user.id}`, 60, WINDOW.minute);
   const body = await parseJson(req, createDiarySchema);
 
   const { data: entry } = await withIdempotency(

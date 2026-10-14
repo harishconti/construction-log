@@ -72,7 +72,11 @@ member of project A cannot read or write project B.
 
 - Flow: **presign → browser PUT direct to R2 → finalize → link to record**. Image bytes never pass
   through Vercel. MIME allowlist and size are enforced server-side; object keys are never trusted
-  from the client.
+  from the client. Finalize also verifies the file's **magic bytes** match its declared type (rejects
+  with `CONTENT_MISMATCH`).
+- **Rate limits** (fixed window, per user) apply to `POST /api/uploads/presign` (120/min),
+  transaction creates (120/min), diary creates (60/min) and member invites (60/hour); exceeding returns
+  `429 RATE_LIMITED`.
 - **Allowed types**: inline-viewable raster images (`image/jpeg|png|webp|gif`); download-only
   (`application/pdf`, `text/plain`, `text/csv`, `application/vnd.ms-excel` (xls),
   `…spreadsheetml.sheet` (xlsx), `image/heic|heif`). Active types (`text/html`, `image/svg+xml`,

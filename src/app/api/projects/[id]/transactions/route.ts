@@ -3,6 +3,7 @@ import { ApiError, getPagination, handle, json, parseJson, parseOptionalDate } f
 import { requireUser } from '@/lib/auth';
 import { prisma } from '@/lib/prisma';
 import { requireRole } from '@/lib/requireRole';
+import { rateLimit, WINDOW } from '@/lib/ratelimit';
 import { writeAudit } from '@/lib/audit';
 import { withIdempotency } from '@/lib/idempotency';
 import { linkAttachments } from '@/lib/attachments';
@@ -103,6 +104,7 @@ export const POST = handle<Ctx>(async (req, { params: paramsPromise }) => {
   const params = await paramsPromise;
   const user = await requireUser();
   await requireRole(params.id, user.id, 'editor');
+  await rateLimit(`tx:${user.id}`, 120, WINDOW.minute);
   const body = await parseJson(req, createTransactionSchema);
 
   const category = await prisma.category.findUnique({ where: { id: body.categoryId } });
