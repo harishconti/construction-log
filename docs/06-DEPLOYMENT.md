@@ -54,6 +54,11 @@ npx prisma migrate deploy    # production / CI
 - `NEXT_PUBLIC_*` values are browser-visible and embedded at build time — never put secrets there.
 - Redeploy after changing variables that are read at build time.
 
+> **Build vs runtime:** the build does **not** require secrets — the Neon Auth client is initialized
+> lazily at request time (`src/lib/auth/server.ts`), so `next build` succeeds even when `NEON_AUTH_*`
+> is unset. The **deployed runtime** still needs `NEON_AUTH_BASE_URL`, `NEON_AUTH_COOKIE_SECRET`,
+> `DIRECT_URL` and the `R2_*` values, or auth/upload routes will error. Node is pinned to `22.x`.
+
 ## 4. Build & release
 1. Run `npm run lint`, `npm run typecheck`, `npm test`, `npm run build` locally — all must pass.
 2. Take a database backup.
