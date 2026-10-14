@@ -90,9 +90,14 @@ on change, and `requireRole` uses one query for members · `#19` `/api/health` r
 down · `#20` cleanup batch-deletes R2 objects and purges stale idempotency keys · `#21` CI runs on all
 branches.
 
-**Batch A3 & B5–B6 — pending** (hardening: rate limiting, security headers, magic-byte sniff,
-backup/restore hardening, dependency upgrades, enum/CHECK constraints; design: dashboard/budgets rework
-and polish/PWA assets).
+**Design batch B1–B2 — done** (foundation & shell): semantic colour tokens + Tailwind mapping + dark
+mode (`globals.css`, `tailwind.config.ts`), Archivo/IBM Plex Sans via `next/font`, global `:focus-visible`
+ring, `src/lib/format.ts` (`formatINR`, IST `formatDate`/`formatDayLabel`), `viewport-fit=cover`;
+`NavLink` with active state + `aria-current` and `lucide-react` icons, desktop sidebar, mobile bottom
+bar with icons and safe-area padding, `max-w-[1200px]` content.
+
+**Design batch B3–B4 & A3/B5–B6 — pending** (UI primitives + transactions sheet/FAB/filters; hardening;
+dashboard/budgets rework; polish/PWA assets).
 
 ## Not yet implemented (backlog)
 1. **Magic link**: UI is wired (`signIn.magicLink`), but the branch reports `magicLink.enabled: false`

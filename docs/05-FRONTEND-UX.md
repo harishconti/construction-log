@@ -31,6 +31,17 @@
   used in development). Show clear messages on invalid credentials and unverified accounts.
 - Sign-out clears the session and returns to `/login`.
 
+## Design system
+- **Tokens** live in `globals.css` (semantic `--bg/--surface/--border/--ink/--primary/--ok/--warn/--danger`
+  + dark-mode values) and are mapped in `tailwind.config.ts` (`bg-bg`, `text-ink-2`, `bg-primary-tint`,
+  `border-border`, …). Prefer these over raw `slate-*`/`white` when adding UI.
+- **Type**: Archivo (`font-display`) for headings, IBM Plex Sans (`font-body`) for UI, loaded via `next/font`.
+- **Focus**: a global `:focus-visible` ring is defined; do not use `outline-none`.
+- **Formatters**: `src/lib/format.ts` — `formatINR` (with `compact`) and `formatDate`/`formatDayLabel`
+  in `Asia/Kolkata`. Use `tabular-nums` for money columns.
+- **Nav**: `NavLink` renders active state + `aria-current`, with `lucide-react` icons; desktop sidebar
+  and a mobile bottom bar (Dashboard / Expenses / Diary / More) that respects the safe-area inset.
+
 ## Key UI Patterns
 - **Mobile-first**: bottom tab bar on mobile (Dashboard / Transactions / Diary / More), sidebar on desktop.
 - **Transaction form**: bottom-sheet modal on mobile, side drawer on desktop. Fields: date, category

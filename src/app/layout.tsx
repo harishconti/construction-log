@@ -1,6 +1,15 @@
 import type { Metadata, Viewport } from 'next';
+import { Archivo, IBM_Plex_Sans } from 'next/font/google';
 import { ServiceWorkerRegister } from '@/components/ServiceWorkerRegister';
 import './globals.css';
+
+const display = Archivo({ subsets: ['latin'], weight: ['600', '700'], variable: '--font-display', display: 'swap' });
+const body = IBM_Plex_Sans({
+  subsets: ['latin'],
+  weight: ['400', '500', '600'],
+  variable: '--font-body',
+  display: 'swap',
+});
 
 export const metadata: Metadata = {
   title: 'Construction Ledger',
@@ -9,14 +18,18 @@ export const metadata: Metadata = {
 };
 
 export const viewport: Viewport = {
-  themeColor: '#2563eb',
   width: 'device-width',
   initialScale: 1,
+  viewportFit: 'cover',
+  themeColor: [
+    { media: '(prefers-color-scheme: light)', color: '#f5f4f0' },
+    { media: '(prefers-color-scheme: dark)', color: '#121417' },
+  ],
 };
 
 export default function RootLayout({ children }: { children: React.ReactNode }) {
   return (
-    <html lang="en">
+    <html lang="en" className={`${display.variable} ${body.variable}`}>
       <body>
         {children}
         <ServiceWorkerRegister />
