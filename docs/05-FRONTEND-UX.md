@@ -18,6 +18,9 @@
 ## Auth UI
 - Sign-in / sign-up is provided by **Neon Auth** (`@neondatabase/auth` client through the same-origin
   `/api/auth` proxy). No custom password forms or storage.
+- **Magic link**: the login page offers "Email me a magic link" (`signIn.magicLink({ email, callbackURL })`).
+  Requires the magic-link plugin to be **enabled on the Neon Auth branch**; until then the endpoint
+  returns 404 and the UI surfaces the error.
 - Handle loading, error, and **email-verification** states (code-based; the shared SMTP provider is
   used in development). Show clear messages on invalid credentials and unverified accounts.
 - Sign-out clears the session and returns to `/login`.
@@ -41,6 +44,10 @@
   GST as an included component, never added on top.
 - **Offline**: forms clearly show **unsaved** state; there is no offline write sync in v1. Do not
   imply queued writes.
+- **Transactions**: admins can soft-delete and restore; a "Show deleted" toggle reveals soft-deleted
+  rows. Bill thumbnails open in a full-screen lightbox.
+- **Diary**: the author (or an admin) can edit an entry; an admin can delete it. Photos open in the
+  same lightbox.
 - **Empty states**: friendly prompts ("No transactions yet — add your first expense").
 
 ## PWA

@@ -2,6 +2,7 @@
 
 import { useCallback, useEffect, useState } from 'react';
 import { api } from '@/lib/api-client';
+import { Lightbox } from '@/components/Lightbox';
 
 type Category = { id: string; name: string; type: string };
 type Attachment = { id: string; url: string; mimeType: string };
@@ -13,25 +14,40 @@ type Transaction = {
   vendor: string | null;
   paymentMode: string;
   description: string | null;
+  version: number;
+  deletedAt: string | null;
   category: { id: string; name: string };
   attachments: Attachment[];
 };
 
 const PAYMENT_MODES = ['cash', 'upi', 'bank', 'card', 'credit'];
 
-export function TransactionsView({ projectId }: { projectId: string }) {
+export function TransactionsView({
+  projectId,
+  role,
+}: {
+  projectId: string;
+  currentUserId: string;
+  role: string;
+}) {
   const [items, setItems] = useState<Transaction[]>([]);
   const [categories, setCategories] = useState<Category[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [showForm, setShowForm] = useState(false);
+  const [showDeleted, setShowDeleted] = useState(false);
+  const [lightbox, setLightbox] = useState<string | null>(null);
+
+  const isAdmin = role === 'admin';
 
   const load = useCallback(async () => {
     setLoading(true);
     setError(null);
     try {
       const [txRes, catRes] = await Promise.all([
-        api.get<{ items: Transaction[] }>(`/api/projects/${projectId}/transactions`),
+        api.get<{ items: Transaction[] }>(
+          `/api/projects/${projectId}/transactions${showDeleted ? '?includeDeleted=true' : ''}`,
+        ),
         api.get<{ categories: Category[] }>(`/api/projects/${projectId}/categories`),
       ]);
       setItems(txRes.items);
@@ -41,24 +57,53 @@ export function TransactionsView({ projectId }: { projectId: string }) {
     } finally {
       setLoading(false);
     }
-  }, [projectId]);
+  }, [projectId, showDeleted]);
 
   useEffect(() => {
     // eslint-disable-next-line react-hooks/set-state-in-effect
     void load();
   }, [load]);
 
+  async function remove(t: Transaction) {
+    if (!window.confirm('Delete this transaction? (can be restored by an admin)')) return;
+    setError(null);
+    try {
+      await api.delete(`/api/projects/${projectId}/transactions/${t.id}`);
+      void load();
+    } catch (err) {
+      setError(err instanceof Error ? err.message : 'Failed to delete');
+    }
+  }
+
+  async function restore(t: Transaction) {
+    setError(null);
+    try {
+      await api.post(`/api/projects/${projectId}/transactions/${t.id}/restore`);
+      void load();
+    } catch (err) {
+      setError(err instanceof Error ? err.message : 'Failed to restore');
+    }
+  }
+
   return (
     <div className="space-y-4">
-      <div className="flex items-center justify-between">
+      <div className="flex flex-wrap items-center justify-between gap-2">
         <h1 className="text-lg font-semibold">Transactions</h1>
-        <button
-          type="button"
-          onClick={() => setShowForm((v) => !v)}
-          className="rounded-lg bg-primary px-3 py-1.5 text-sm font-medium text-white"
-        >
-          {showForm ? 'Close' : 'Add'}
-        </button>
+        <div className="flex items-center gap-2">
+          {isAdmin && (
+            <label className="flex items-center gap-1 text-sm text-slate-600">
+              <input type="checkbox" checked={showDeleted} onChange={(e) => setShowDeleted(e.target.checked)} />
+              Show deleted
+            </label>
+          )}
+          <button
+            type="button"
+            onClick={() => setShowForm((v) => !v)}
+            className="rounded-lg bg-primary px-3 py-1.5 text-sm font-medium text-white"
+          >
+            {showForm ? 'Close' : 'Add'}
+          </button>
+        </div>
       </div>
 
       {showForm && (
@@ -83,25 +128,45 @@ export function TransactionsView({ projectId }: { projectId: string }) {
       ) : (
         <ul className="divide-y divide-slate-100 overflow-hidden rounded-xl bg-white shadow-sm">
           {items.map((t) => (
-            <li key={t.id} className="flex items-center justify-between p-3 text-sm">
-              <div>
-                <div className="font-medium">
-                  {new Date(t.occurredAt).toLocaleDateString()} · {t.category.name}
+            <li key={t.id} className={`p-3 text-sm ${t.deletedAt ? 'opacity-60' : ''}`}>
+              <div className="flex items-center justify-between gap-2">
+                <div>
+                  <div className="font-medium">
+                    {new Date(t.occurredAt).toLocaleDateString()} · {t.category.name}
+                    {t.deletedAt && <span className="ml-2 rounded bg-red-50 px-1.5 py-0.5 text-xs text-red-600">deleted</span>}
+                  </div>
+                  <div className="text-slate-500">{[t.vendor, t.paymentMode].filter(Boolean).join(' · ')}</div>
                 </div>
-                <div className="text-slate-500">
-                  {[t.vendor, t.paymentMode].filter(Boolean).join(' · ')}
+                <div className="flex items-center gap-3">
+                  <span className="font-medium">₹{Number(t.amount).toLocaleString('en-IN')}</span>
+                  {isAdmin &&
+                    (t.deletedAt ? (
+                      <button type="button" onClick={() => restore(t)} className="text-primary hover:underline">
+                        Restore
+                      </button>
+                    ) : (
+                      <button type="button" onClick={() => remove(t)} className="text-red-600 hover:underline">
+                        Delete
+                      </button>
+                    ))}
                 </div>
               </div>
-              <div className="text-right">
-                <div className="font-medium">₹{Number(t.amount).toLocaleString('en-IN')}</div>
-                {t.attachments.length > 0 && (
-                  <div className="text-xs text-slate-400">{t.attachments.length} photo(s)</div>
-                )}
-              </div>
+              {t.attachments.length > 0 && (
+                <div className="mt-2 flex gap-2 overflow-x-auto">
+                  {t.attachments.map((a) => (
+                    <button key={a.id} type="button" onClick={() => setLightbox(a.url)} className="shrink-0">
+                      {/* eslint-disable-next-line @next/next/no-img-element */}
+                      <img src={a.url} alt="" className="h-16 w-16 rounded-lg object-cover" />
+                    </button>
+                  ))}
+                </div>
+              )}
             </li>
           ))}
         </ul>
       )}
+
+      <Lightbox url={lightbox} onClose={() => setLightbox(null)} />
     </div>
   );
 }
