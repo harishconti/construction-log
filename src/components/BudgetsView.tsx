@@ -1,7 +1,17 @@
 'use client';
 
 import { useCallback, useEffect, useState } from 'react';
+import { ChevronLeft, ChevronRight } from 'lucide-react';
 import { api } from '@/lib/api-client';
+import { formatDate, formatINR } from '@/lib/format';
+import { Button } from '@/components/ui/Button';
+import { IconButton } from '@/components/ui/IconButton';
+import { Sheet } from '@/components/ui/Sheet';
+import { Field, MoneyInput, Textarea, Segmented } from '@/components/ui/inputs';
+import { StatusBadge, ProgressBar, type BudgetStatus } from '@/components/ui/StatusBadge';
+import { Alert } from '@/components/ui/Alert';
+import { SkeletonRows } from '@/components/ui/Skeleton';
+import { useToast } from '@/components/ui/Toast';
 
 type Granularity = 'week' | 'month';
 type Row = {
@@ -9,29 +19,20 @@ type Row = {
   budgetId: string | null;
   name: string;
   type: string;
+  isActive?: boolean;
   planned: number;
   actual: number;
   variance: number;
   percentUsed: number | null;
-  status: 'green' | 'yellow' | 'red' | null;
+  status: BudgetStatus | null;
 };
-type BudgetResponse = {
+type Resp = {
   granularity: Granularity;
   periodStart: string;
   periodEnd: string;
   rows: Row[];
-  totals: { planned: number; actual: number; variance: number; percentUsed: number | null; status: Row['status'] };
+  totals: { planned: number; actual: number; variance: number; percentUsed: number | null; status: BudgetStatus | null };
 };
-
-const STATUS_CLASS: Record<string, string> = {
-  green: 'text-green-700',
-  yellow: 'text-amber-600',
-  red: 'text-red-600',
-};
-
-function fmt(n: number) {
-  return new Intl.NumberFormat('en-IN', { style: 'currency', currency: 'INR', maximumFractionDigits: 0 }).format(n);
-}
 
 function isoDate(d: Date) {
   return d.toISOString().slice(0, 10);
@@ -41,11 +42,13 @@ function yyyymm(d: Date) {
 }
 
 export function BudgetsView({ projectId, canEdit }: { projectId: string; canEdit: boolean }) {
+  const toast = useToast();
   const [granularity, setGranularity] = useState<Granularity>('month');
   const [anchor, setAnchor] = useState<Date>(() => new Date());
-  const [data, setData] = useState<BudgetResponse | null>(null);
+  const [data, setData] = useState<Resp | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
+  const [revise, setRevise] = useState<{ open: boolean; row: Row | null }>({ open: false, row: null });
 
   const period = granularity === 'week' ? isoDate(anchor) : yyyymm(anchor);
 
@@ -53,7 +56,7 @@ export function BudgetsView({ projectId, canEdit }: { projectId: string; canEdit
     setLoading(true);
     setError(null);
     try {
-      const res = await api.get<BudgetResponse>(
+      const res = await api.get<Resp>(
         `/api/projects/${projectId}/budgets?granularity=${granularity}&period=${period}`,
       );
       setData(res);
@@ -70,121 +73,235 @@ export function BudgetsView({ projectId, canEdit }: { projectId: string; canEdit
   }, [load]);
 
   function step(direction: -1 | 1) {
-    const d = new Date(anchor);
-    if (granularity === 'week') d.setUTCDate(d.getUTCDate() + direction * 7);
-    else d.setUTCMonth(d.getUTCMonth() + direction);
-    setAnchor(d);
+    setAnchor((a) => {
+      const d = new Date(a);
+      if (granularity === 'week') d.setUTCDate(d.getUTCDate() + direction * 7);
+      else d.setUTCMonth(d.getUTCMonth() + direction);
+      return d;
+    });
   }
 
-  async function revise(row: Row) {
-    const current = row.planned;
-    const input = window.prompt(`New planned amount for ${row.name}`, String(current));
-    if (input === null) return;
-    const amount = Number(input);
-    if (Number.isNaN(amount) || amount < 0) return;
-    const reason = window.prompt('Reason for revision (optional)') ?? null;
-    try {
-      if (row.budgetId) {
-        await api.patch(`/api/projects/${projectId}/budgets/${row.budgetId}`, { plannedAmount: amount, reason });
-      } else {
-        const periodStart = data?.periodStart;
-        if (!periodStart) return;
-        await api.post(`/api/projects/${projectId}/budgets`, {
-          categoryId: row.categoryId,
-          periodType: granularity,
-          periodStart,
-          plannedAmount: amount,
-          note: reason,
-        });
-      }
-      void load();
-    } catch (err) {
-      setError(err instanceof Error ? err.message : 'Failed to save budget');
-    }
-  }
+  const label = data
+    ? granularity === 'week'
+      ? `Week of ${formatDate(data.periodStart)}`
+      : new Intl.DateTimeFormat('en-IN', { month: 'long', year: 'numeric', timeZone: 'Asia/Kolkata' }).format(
+          new Date(data.periodStart),
+        )
+    : period;
 
   return (
     <div className="space-y-4">
       <div className="flex flex-wrap items-center justify-between gap-3">
-        <h1 className="text-lg font-semibold">Budgets</h1>
+        <h1 className="font-display text-2xl font-bold">Budgets</h1>
         <div className="flex items-center gap-2">
-          <div className="flex rounded-lg bg-slate-100 p-1 text-sm">
-            {(['week', 'month'] as Granularity[]).map((g) => (
-              <button
-                key={g}
-                type="button"
-                onClick={() => setGranularity(g)}
-                className={`rounded-md px-3 py-1 ${granularity === g ? 'bg-white shadow-sm' : 'text-slate-500'}`}
-              >
-                {g === 'week' ? 'Week' : 'Month'}
-              </button>
-            ))}
-          </div>
-          <button type="button" onClick={() => step(-1)} className="rounded-lg px-2 py-1 text-sm hover:bg-slate-100">
-            ‹
-          </button>
-          <span className="text-sm text-slate-600">
-            {data ? new Date(data.periodStart).toLocaleDateString('en-IN') : period}
-          </span>
-          <button type="button" onClick={() => step(1)} className="rounded-lg px-2 py-1 text-sm hover:bg-slate-100">
-            ›
-          </button>
+          <Segmented
+            options={[
+              { value: 'week', label: 'Week' },
+              { value: 'month', label: 'Month' },
+            ]}
+            value={granularity}
+            onChange={(g) => setGranularity(g)}
+          />
+          <IconButton label="Previous period" onClick={() => step(-1)}>
+            <ChevronLeft size={18} />
+          </IconButton>
+          <span className="min-w-28 text-center text-sm text-ink-2">{label}</span>
+          <IconButton label="Next period" onClick={() => step(1)}>
+            <ChevronRight size={18} />
+          </IconButton>
         </div>
       </div>
 
-      {error && <p className="text-sm text-red-600">{error}</p>}
-      {loading ? (
-        <p className="text-sm text-slate-500">Loading…</p>
+      {error && <Alert message={error} onRetry={load} />}
+
+      {loading && !data ? (
+        <SkeletonRows rows={4} />
       ) : data ? (
-        <div className="overflow-x-auto rounded-xl bg-white shadow-sm">
-          <table className="w-full text-sm">
-            <thead className="border-b border-slate-100 text-left text-slate-500">
-              <tr>
-                <th className="px-3 py-2">Category</th>
-                <th className="px-3 py-2 text-right">Planned</th>
-                <th className="px-3 py-2 text-right">Actual</th>
-                <th className="px-3 py-2 text-right">Variance</th>
-                <th className="px-3 py-2 text-right">% Used</th>
-                {canEdit && <th className="px-3 py-2" />}
-              </tr>
-            </thead>
-            <tbody>
-              {data.rows.map((r) => (
-                <tr key={r.categoryId} className="border-b border-slate-50">
-                  <td className="px-3 py-2">{r.name}</td>
-                  <td className="px-3 py-2 text-right">{fmt(r.planned)}</td>
-                  <td className="px-3 py-2 text-right">{fmt(r.actual)}</td>
-                  <td className={`px-3 py-2 text-right ${r.variance < 0 ? 'text-red-600' : ''}`}>{fmt(r.variance)}</td>
-                  <td className={`px-3 py-2 text-right ${r.status ? STATUS_CLASS[r.status] : ''}`}>
-                    {r.percentUsed === null ? '—' : `${Math.round(r.percentUsed)}%`}
-                  </td>
-                  {canEdit && (
-                    <td className="px-3 py-2 text-right">
-                      <button type="button" onClick={() => revise(r)} className="text-primary hover:underline">
-                        {r.budgetId ? 'Revise' : 'Set'}
-                      </button>
-                    </td>
-                  )}
+        <>
+          {/* Mobile cards */}
+          <ul className="space-y-3 md:hidden">
+            {data.rows.map((r) => (
+              <li key={r.categoryId} className="rounded-lg border border-border bg-surface p-4">
+                <div className="flex items-center justify-between gap-2">
+                  <span className="font-medium">
+                    {r.name} {r.isActive === false && <span className="text-xs text-ink-3">(inactive)</span>}
+                  </span>
+                  {r.status && <StatusBadge status={r.status} />}
+                </div>
+                <p className="num mt-1 text-sm text-ink-2">
+                  {formatINR(r.actual)}
+                  {r.planned > 0 ? ` of ${formatINR(r.planned)}` : ' · no budget'}
+                </p>
+                {r.planned > 0 && (
+                  <div className="mt-2">
+                    <ProgressBar percent={r.percentUsed ?? 0} status={r.status ?? 'green'} />
+                  </div>
+                )}
+                {canEdit && (
+                  <Button variant="secondary" className="mt-3 w-full" onClick={() => setRevise({ open: true, row: r })}>
+                    {r.budgetId ? 'Revise' : 'Set budget'}
+                  </Button>
+                )}
+              </li>
+            ))}
+          </ul>
+
+          {/* Desktop table */}
+          <div className="hidden overflow-x-auto rounded-lg border border-border bg-surface md:block">
+            <table className="w-full text-sm">
+              <thead className="border-b border-border text-left text-ink-3">
+                <tr>
+                  <th className="px-3 py-2">Category</th>
+                  <th className="px-3 py-2 text-right">Planned</th>
+                  <th className="px-3 py-2 text-right">Actual</th>
+                  <th className="px-3 py-2 text-right">Variance</th>
+                  <th className="px-3 py-2">Used</th>
+                  {canEdit && <th className="px-3 py-2" />}
                 </tr>
-              ))}
-            </tbody>
-            <tfoot>
-              <tr className="font-medium">
-                <td className="px-3 py-2">Total</td>
-                <td className="px-3 py-2 text-right">{fmt(data.totals.planned)}</td>
-                <td className="px-3 py-2 text-right">{fmt(data.totals.actual)}</td>
-                <td className={`px-3 py-2 text-right ${data.totals.variance < 0 ? 'text-red-600' : ''}`}>
-                  {fmt(data.totals.variance)}
-                </td>
-                <td className="px-3 py-2 text-right">
-                  {data.totals.percentUsed === null ? '—' : `${Math.round(data.totals.percentUsed)}%`}
-                </td>
-                {canEdit && <td />}
-              </tr>
-            </tfoot>
-          </table>
-        </div>
+              </thead>
+              <tbody>
+                {data.rows.map((r) => (
+                  <tr key={r.categoryId} className="border-b border-border/60">
+                    <td className="px-3 py-2">
+                      {r.name} {r.isActive === false && <span className="text-xs text-ink-3">(inactive)</span>}
+                    </td>
+                    <td className="num px-3 py-2 text-right">{formatINR(r.planned)}</td>
+                    <td className="num px-3 py-2 text-right">{formatINR(r.actual)}</td>
+                    <td className={`num px-3 py-2 text-right ${r.variance < 0 ? 'text-danger' : ''}`}>
+                      {formatINR(r.variance)}
+                    </td>
+                    <td className="px-3 py-2">
+                      <div className="flex items-center gap-2">
+                        {r.status && <StatusBadge status={r.status} />}
+                        {r.planned > 0 && (
+                          <div className="w-24">
+                            <ProgressBar percent={r.percentUsed ?? 0} status={r.status ?? 'green'} />
+                          </div>
+                        )}
+                      </div>
+                    </td>
+                    {canEdit && (
+                      <td className="px-3 py-2 text-right">
+                        <button
+                          type="button"
+                          onClick={() => setRevise({ open: true, row: r })}
+                          className="text-primary hover:underline"
+                        >
+                          {r.budgetId ? 'Revise' : 'Set'}
+                        </button>
+                      </td>
+                    )}
+                  </tr>
+                ))}
+              </tbody>
+              <tfoot>
+                <tr className="font-semibold">
+                  <td className="px-3 py-2">Total</td>
+                  <td className="num px-3 py-2 text-right">{formatINR(data.totals.planned)}</td>
+                  <td className="num px-3 py-2 text-right">{formatINR(data.totals.actual)}</td>
+                  <td className={`num px-3 py-2 text-right ${data.totals.variance < 0 ? 'text-danger' : ''}`}>
+                    {formatINR(data.totals.variance)}
+                  </td>
+                  <td className="px-3 py-2">{data.totals.status && <StatusBadge status={data.totals.status} />}</td>
+                  {canEdit && <td />}
+                </tr>
+              </tfoot>
+            </table>
+          </div>
+        </>
       ) : null}
+
+      {revise.open && revise.row && (
+        <ReviseSheet
+          projectId={projectId}
+          granularity={granularity}
+          periodStart={data?.periodStart ?? ''}
+          row={revise.row}
+          onClose={() => setRevise({ open: false, row: null })}
+          onSaved={() => {
+            toast.notify('Budget saved');
+            setRevise({ open: false, row: null });
+            void load();
+          }}
+        />
+      )}
     </div>
+  );
+}
+
+function ReviseSheet({
+  projectId,
+  granularity,
+  periodStart,
+  row,
+  onClose,
+  onSaved,
+}: {
+  projectId: string;
+  granularity: Granularity;
+  periodStart: string;
+  row: Row;
+  onClose: () => void;
+  onSaved: () => void;
+}) {
+  const [amount, setAmount] = useState(row.planned ? String(row.planned) : '');
+  const [reason, setReason] = useState('');
+  const [pending, setPending] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+
+  async function submit(e: React.FormEvent) {
+    e.preventDefault();
+    setError(null);
+    setPending(true);
+    try {
+      const plannedAmount = Number(amount);
+      if (row.budgetId) {
+        await api.patch(`/api/projects/${projectId}/budgets/${row.budgetId}`, {
+          plannedAmount,
+          reason: reason || null,
+        });
+      } else {
+        await api.post(`/api/projects/${projectId}/budgets`, {
+          categoryId: row.categoryId,
+          periodType: granularity,
+          periodStart,
+          plannedAmount,
+          note: reason || null,
+        });
+      }
+      onSaved();
+    } catch (err) {
+      setError(err instanceof Error ? err.message : 'Failed to save');
+    } finally {
+      setPending(false);
+    }
+  }
+
+  return (
+    <Sheet
+      open
+      onClose={onClose}
+      title={`${row.budgetId ? 'Revise' : 'Set'} budget · ${row.name}`}
+      footer={
+        <div className="flex gap-2">
+          <Button variant="secondary" className="flex-1" onClick={onClose}>
+            Cancel
+          </Button>
+          <Button type="submit" form="budget-form" className="flex-1" loading={pending}>
+            Save
+          </Button>
+        </div>
+      }
+    >
+      <form id="budget-form" onSubmit={submit} className="space-y-3">
+        <Field label="Planned amount">
+          <MoneyInput value={amount} onValueChange={setAmount} placeholder="0" autoFocus />
+        </Field>
+        <Field label="Reason" hint="Optional note for the revision">
+          <Textarea value={reason} onChange={(e) => setReason(e.target.value)} rows={2} />
+        </Field>
+        {error && <Alert message={error} />}
+      </form>
+    </Sheet>
   );
 }

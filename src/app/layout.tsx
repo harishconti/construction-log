@@ -16,6 +16,7 @@ export const metadata: Metadata = {
   title: 'Construction Ledger',
   description: 'Track expenses, diary entries, and budgets for your build.',
   manifest: '/manifest.json',
+  icons: { icon: '/icon.svg', apple: '/apple-touch-icon.png' },
 };
 
 export const viewport: Viewport = {

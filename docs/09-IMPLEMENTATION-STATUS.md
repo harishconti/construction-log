@@ -110,9 +110,18 @@ categories; removed dead `register`/`login` schemas and `next/image` remotePatte
 cache bumped and per-user shell pages no longer precached; backup script paginates prune, and restore
 uses a 0700 temp dir / 0600 file and **verifies the SHA-256**.
 
-**Batch A3 (rest) & B5–B6 — pending:** rate limiting; magic-byte sniffing; dependency upgrades
-(React 19 / Prisma 6 / vitest); enum/CHECK constraints; design dashboard/budgets rework and remaining
-polish (diary/dashboard/login/members onto the primitives) + PWA PNG icons.
+**Design batch B5–B6 — done** (dashboard/budgets rework & polish): Dashboard now has a hero
+"budget used" card with a progress bar, contextual stat cards, a horizontal planned-vs-actual chart
+(compact ₹ ticks) and per-category progress rows with `StatusBadge`. Budgets use `Segmented`
+Week/Month, 44px period stepper, a readable period label, mobile cards + desktop table, `StatusBadge`/
+`ProgressBar`, and a revise **Sheet** (amount + reason). Diary uses the Sheet/ConfirmDialog/Toast and
+day labels. Members, Settings (inline rename, inactive group), Login (method order, tablist, Alert) and
+Projects (status pills, "New project" sheet) are migrated onto the primitives; the **More** page is a
+grouped list with icons and sign-out. PWA now ships 192/512 + maskable PNG icons and an
+`apple-touch-icon`. `window.confirm`/`prompt` are gone from `src/`.
+
+**Batch A3 (rest) — pending:** rate limiting; magic-byte sniffing; dependency upgrades (React 19 /
+Prisma 6 / vitest); enum/CHECK constraints.
 
 ## Not yet implemented (backlog)
 1. **Magic link**: UI is wired (`signIn.magicLink`), but the branch reports `magicLink.enabled: false`

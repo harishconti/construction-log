@@ -2,11 +2,20 @@
 
 import { useState } from 'react';
 import { useRouter } from 'next/navigation';
+import { Plus } from 'lucide-react';
 import { api } from '@/lib/api-client';
+import { Button } from '@/components/ui/Button';
+import { Sheet } from '@/components/ui/Sheet';
+import { Alert } from '@/components/ui/Alert';
+import { Field, TextInput, Textarea } from '@/components/ui/inputs';
+import { todayIST } from '@/lib/period';
 
 export function NewProjectForm() {
   const router = useRouter();
+  const [open, setOpen] = useState(false);
   const [name, setName] = useState('');
+  const [description, setDescription] = useState('');
+  const [startDate, setStartDate] = useState(() => todayIST());
   const [pending, setPending] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
@@ -17,9 +26,12 @@ export function NewProjectForm() {
     try {
       const { project } = await api.post<{ project: { id: string } }>('/api/projects', {
         name,
-        startDate: new Date().toISOString(),
+        description: description || null,
+        startDate: new Date(startDate).toISOString(),
       });
       setName('');
+      setDescription('');
+      setOpen(false);
       router.push(`/projects/${project.id}`);
       router.refresh();
     } catch (err) {
@@ -30,22 +42,45 @@ export function NewProjectForm() {
   }
 
   return (
-    <form onSubmit={submit} className="flex flex-col gap-2 sm:flex-row">
-      <input
-        value={name}
-        onChange={(e) => setName(e.target.value)}
-        placeholder="New project name"
-        required
-        className="flex-1 rounded-lg border border-slate-300 px-3 py-2 text-sm outline-none focus:border-primary"
-      />
-      <button
-        type="submit"
-        disabled={pending}
-        className="rounded-lg bg-primary px-4 py-2 text-sm font-medium text-white disabled:opacity-60"
+    <>
+      <Button onClick={() => setOpen(true)}>
+        <Plus size={16} aria-hidden /> New project
+      </Button>
+
+      <Sheet
+        open={open}
+        onClose={() => setOpen(false)}
+        title="New project"
+        footer={
+          <div className="flex gap-2">
+            <Button variant="secondary" className="flex-1" onClick={() => setOpen(false)}>
+              Cancel
+            </Button>
+            <Button type="submit" form="new-project-form" className="flex-1" loading={pending}>
+              Create
+            </Button>
+          </div>
+        }
       >
-        {pending ? 'Creating…' : 'Create project'}
-      </button>
-      {error && <p className="text-sm text-red-600 sm:ml-2 sm:self-center">{error}</p>}
-    </form>
+        <form id="new-project-form" onSubmit={submit} className="space-y-3">
+          <Field label="Name">
+            <TextInput required value={name} onChange={(e) => setName(e.target.value)} autoFocus />
+          </Field>
+          <Field label="Description" hint="Optional">
+            <Textarea value={description} onChange={(e) => setDescription(e.target.value)} rows={2} />
+          </Field>
+          <Field label="Start date">
+            <input
+              type="date"
+              value={startDate}
+              max={todayIST()}
+              onChange={(e) => setStartDate(e.target.value)}
+              className="h-11 w-full rounded-md border border-border-strong bg-surface px-3 text-base text-ink md:text-sm"
+            />
+          </Field>
+          {error && <Alert message={error} />}
+        </form>
+      </Sheet>
+    </>
   );
 }
