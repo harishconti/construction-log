@@ -1,0 +1,10 @@
+{
+  "name": "Construction Ledger",
+  "short_name": "Build Ledger",
+  "description": "Track expenses, diary entries, and budgets for your build.",
+  "start_url": "/projects",
+  "display": "standalone",
+  "background_color": "#f8fafc",
+  "theme_color": "#2563eb",
+  "icons": []
+}

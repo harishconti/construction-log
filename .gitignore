@@ -1,0 +1,26 @@
+node_modules
+.next
+out
+build
+dist
+
+.env
+.env.local
+.env.*.local
+.env.production
+
+*.log
+npm-debug.log*
+
+.DS_Store
+coverage
+.vitest
+
+*.tsbuildinfo
+
+# Vendored coding-agent skills (re-installable via `neon skills`)
+.agents/
+
+# Prisma
+prisma/*.db
+prisma/*.db-journal
