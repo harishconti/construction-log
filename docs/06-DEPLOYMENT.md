@@ -119,7 +119,7 @@ Cleanest is to reconnect Neon without a prefix. Otherwise, in Vercel → Environ
 ## 8. Monitoring
 - Watch Neon compute/storage/transfer, R2 storage/operations, and Vercel function usage/quotas.
 - Expect Neon wake-up latency after idle; do not keep it awake with heartbeats.
-- Health endpoint must expose no secrets or private data.
+- Health endpoint (`GET /api/health`) exposes no secrets or private data.
 
 ## 9. Rollback
 - Vercel: promote a previous deployment (instant). Database changes are forward-only — apply a new

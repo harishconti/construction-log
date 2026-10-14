@@ -22,14 +22,16 @@ function formatSize(bytes: number | null): string {
 
 /**
  * Renders attachments: viewable raster images as clickable thumbnails (lightbox), everything
- * else as a download chip. Non-images are never rendered inline.
+ * else as a download chip. Non-images are never rendered inline. Optional `onDelete` adds a remove control.
  */
 export function AttachmentList({
   attachments,
   thumbClass = 'h-24 w-24',
+  onDelete,
 }: {
   attachments: AttachmentItem[];
   thumbClass?: string;
+  onDelete?: (id: string) => void;
 }) {
   const [lightbox, setLightbox] = useState<string | null>(null);
 
@@ -40,26 +42,44 @@ export function AttachmentList({
 
   return (
     <>
-      <div className="mt-3 flex flex-wrap gap-2">
+      <div className="mt-3 flex flex-wrap gap-3">
         {images.map((a) => (
-          <button key={a.id} type="button" onClick={() => setLightbox(a.url)} className="shrink-0">
-            {/* eslint-disable-next-line @next/next/no-img-element */}
-            <img src={a.url} alt={a.originalName ?? ''} className={`${thumbClass} rounded-lg object-cover`} />
-          </button>
+          <div key={a.id} className="relative">
+            <button type="button" onClick={() => setLightbox(a.url)} className="block">
+              {/* eslint-disable-next-line @next/next/no-img-element */}
+              <img src={a.url} alt={a.originalName ?? ''} className={`${thumbClass} rounded-lg object-cover`} />
+            </button>
+            {onDelete && <DeleteChip onClick={() => onDelete(a.id)} />}
+          </div>
         ))}
         {files.map((a) => (
-          <a
-            key={a.id}
-            href={a.downloadUrl}
-            className="flex max-w-full items-center gap-2 rounded-lg border border-slate-200 bg-slate-50 px-3 py-2 text-sm hover:bg-slate-100"
-          >
-            <span className="max-w-[12rem] truncate">{a.originalName ?? 'file'}</span>
-            {a.size != null && <span className="text-xs text-slate-400">{formatSize(a.size)}</span>}
-            <span className="text-primary">Download</span>
-          </a>
+          <div key={a.id} className="relative">
+            <a
+              href={a.downloadUrl}
+              className="flex max-w-full items-center gap-2 rounded-lg border border-slate-200 bg-slate-50 px-3 py-2 text-sm hover:bg-slate-100"
+            >
+              <span className="max-w-[12rem] truncate">{a.originalName ?? 'file'}</span>
+              {a.size != null && <span className="text-xs text-slate-400">{formatSize(a.size)}</span>}
+              <span className="text-primary">Download</span>
+            </a>
+            {onDelete && <DeleteChip onClick={() => onDelete(a.id)} />}
+          </div>
         ))}
       </div>
       <Lightbox url={lightbox} onClose={() => setLightbox(null)} />
     </>
+  );
+}
+
+function DeleteChip({ onClick }: { onClick: () => void }) {
+  return (
+    <button
+      type="button"
+      onClick={onClick}
+      aria-label="Remove attachment"
+      className="absolute -right-2 -top-2 flex h-5 w-5 items-center justify-center rounded-full bg-white text-xs text-red-600 shadow ring-1 ring-slate-200 hover:bg-red-50"
+    >
+      ×
+    </button>
   );
 }

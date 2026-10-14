@@ -6,14 +6,17 @@
 | /login | Neon Auth sign-in / sign-up | Public |
 | /projects | List my projects | Any logged-in |
 | /projects/:id | Dashboard (budget vs actual, recent activity) | viewer |
-| /projects/:id/transactions | Transaction list + filters + add/edit modal | viewer (read) / editor (write) |
+| /projects/:id/transactions | Transaction list + filters + pagination + add/edit modal | viewer (read) / editor (write) |
+| /projects/:id/timeline | Merged transactions + diary feed (date filter, pagination) | viewer |
 | /projects/:id/diary | Diary timeline with photo cards | viewer (read) / editor (write) |
 | /projects/:id/budgets | Budget management (admin) / view (others) | viewer |
+| /projects/:id/more | Mobile menu linking to every section | viewer |
 | /projects/:id/members | Member management | admin |
 | /projects/:id/settings | Project settings + categories | admin |
 
-> **Status:** `/login`, `/projects`, Dashboard, Transactions, Diary, Budgets, **Members** and
-> **Settings** are implemented. Members/Settings are admin-only (non-admins are redirected).
+> **Status:** `/login`, `/projects`, Dashboard, Transactions, Timeline, Diary, Budgets, More,
+> Members and Settings are implemented. Members/Settings are admin-only. On mobile the bottom bar shows
+> Dashboard / Transactions / Diary + **More** (which links to Budgets, Members, Settings, Timeline).
 
 ## Auth UI
 - Sign-in / sign-up is provided by **Neon Auth** (`@neondatabase/auth` client through the same-origin
@@ -51,10 +54,12 @@
   GST as an included component, never added on top.
 - **Offline**: forms clearly show **unsaved** state; there is no offline write sync in v1. Do not
   imply queued writes.
-- **Transactions**: admins can soft-delete and restore; a "Show deleted" toggle reveals soft-deleted
-  rows. Bill thumbnails open in a full-screen lightbox.
-- **Diary**: the author (or an admin) can edit an entry; an admin can delete it. Photos open in the
+- **Transactions**: filters (category, payment mode, vendor, date range) + pagination; admins can
+  soft-delete/restore ("Show deleted"); editors can edit any transaction; attachments can be added or
+  removed inline. Bill thumbnails open in a lightbox; non-images show as download chips.
+- **Diary**: author/admin edit inline (add/remove photos on edit); admin delete. Photos open in the
   same lightbox.
+- **Timeline**: transactions and diary merged chronologically, with a date filter and pagination.
 - **Empty states**: friendly prompts ("No transactions yet — add your first expense").
 
 ## PWA

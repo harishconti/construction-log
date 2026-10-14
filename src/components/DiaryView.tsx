@@ -30,6 +30,7 @@ export function DiaryView({
   const [editingId, setEditingId] = useState<string | null>(null);
 
   const isAdmin = role === 'admin';
+  const canWrite = role === 'admin' || role === 'editor';
 
   const load = useCallback(async () => {
     setLoading(true);
@@ -57,6 +58,17 @@ export function DiaryView({
       void load();
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Failed to delete');
+    }
+  }
+
+  async function deleteAttachment(id: string) {
+    if (!window.confirm('Remove this attachment?')) return;
+    setError(null);
+    try {
+      await api.delete(`/api/attachments/${id}`);
+      void load();
+    } catch (err) {
+      setError(err instanceof Error ? err.message : 'Failed to remove attachment');
     }
   }
 
@@ -97,7 +109,7 @@ export function DiaryView({
       ) : (
         <ol className="space-y-3">
           {items.map((e) => {
-            const canEdit = isAdmin || e.createdBy === currentUserId;
+            const canEditThis = isAdmin || e.createdBy === currentUserId;
             if (editingId === e.id) {
               return (
                 <li key={e.id}>
@@ -109,6 +121,7 @@ export function DiaryView({
                       void load();
                     }}
                     onCancel={() => setEditingId(null)}
+                    onDeleteAttachment={deleteAttachment}
                   />
                 </li>
               );
@@ -120,7 +133,7 @@ export function DiaryView({
                     <div className="text-xs text-slate-500">{new Date(e.entryDate).toLocaleDateString()}</div>
                     <h2 className="mt-1 font-medium">{e.title}</h2>
                   </div>
-                  {canEdit && (
+                  {canEditThis && (
                     <div className="flex shrink-0 gap-2 text-sm">
                       <button type="button" onClick={() => setEditingId(e.id)} className="text-primary hover:underline">
                         Edit
@@ -134,7 +147,10 @@ export function DiaryView({
                   )}
                 </div>
                 {e.body && <p className="mt-1 whitespace-pre-wrap text-sm text-slate-600">{e.body}</p>}
-                <AttachmentList attachments={e.attachments} />
+                <AttachmentList
+                  attachments={e.attachments}
+                  onDelete={canEditThis ? deleteAttachment : undefined}
+                />
               </li>
             );
           })}
@@ -149,20 +165,24 @@ function DiaryForm({
   entry,
   onSaved,
   onCancel,
+  onDeleteAttachment,
 }: {
   projectId: string;
   entry?: Entry;
   onSaved: () => void;
   onCancel?: () => void;
+  onDeleteAttachment?: (id: string) => void;
 }) {
-  const [entryDate, setEntryDate] = useState(() => (entry ? entry.entryDate.slice(0, 10) : new Date().toISOString().slice(0, 10)));
+  const [entryDate, setEntryDate] = useState(() =>
+    entry ? entry.entryDate.slice(0, 10) : new Date().toISOString().slice(0, 10),
+  );
   const [title, setTitle] = useState(entry?.title ?? '');
   const [body, setBody] = useState(entry?.body ?? '');
   const [files, setFiles] = useState<FileList | null>(null);
   const [pending, setPending] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
-  async function uploadPhoto(f: File): Promise<string> {
+  async function uploadFile(f: File, parentId?: string): Promise<string> {
     const presign = await api.post<{ uploadUrl: string; attachmentId: string }>('/api/uploads/presign', {
       projectId,
       parentType: 'diary_entry',
@@ -171,8 +191,11 @@ function DiaryForm({
       size: f.size,
     });
     const put = await fetch(presign.uploadUrl, { method: 'PUT', body: f, headers: { 'Content-Type': f.type } });
-    if (!put.ok) throw new Error('Photo upload failed');
-    await api.post(`/api/uploads/${presign.attachmentId}/finalize`, {});
+    if (!put.ok) throw new Error('Upload failed');
+    await api.post(
+      `/api/uploads/${presign.attachmentId}/finalize`,
+      parentId ? { diaryEntryId: parentId } : {},
+    );
     return presign.attachmentId;
   }
 
@@ -188,13 +211,10 @@ function DiaryForm({
           body,
           version: entry.version,
         });
+        if (files) for (const f of Array.from(files)) await uploadFile(f, entry.id);
       } else {
         const attachmentIds: string[] = [];
-        if (files) {
-          for (const f of Array.from(files)) {
-            attachmentIds.push(await uploadPhoto(f));
-          }
-        }
+        if (files) for (const f of Array.from(files)) attachmentIds.push(await uploadFile(f));
         await api.post(
           `/api/projects/${projectId}/diary`,
           { entryDate: new Date(entryDate).toISOString(), title, body, attachmentIds },
@@ -238,22 +258,29 @@ function DiaryForm({
           className="mt-1 w-full rounded-lg border border-slate-300 px-3 py-2"
         />
       </label>
-      {!entry && (
-        <label className="block text-sm">
-          <span className="text-slate-700">Photos &amp; files (up to 10)</span>
-          <input
-            type="file"
-            accept="image/*,.pdf,.txt,.csv,.xls,.xlsx"
-            capture="environment"
-            multiple
-            onChange={(e) => setFiles(e.target.files)}
-            className="mt-1 block w-full text-sm"
-          />
-          <span className="mt-1 block text-xs text-slate-400">
-            Images open in the app; PDF/text/spreadsheet files download only.
-          </span>
-        </label>
+
+      {entry && entry.attachments.length > 0 && (
+        <div>
+          <span className="text-sm text-slate-700">Attachments</span>
+          <AttachmentList attachments={entry.attachments} onDelete={onDeleteAttachment} />
+        </div>
       )}
+
+      <label className="block text-sm">
+        <span className="text-slate-700">{entry ? 'Add photos/files' : 'Photos & files (up to 10)'}</span>
+        <input
+          type="file"
+          accept="image/*,.pdf,.txt,.csv,.xls,.xlsx"
+          capture="environment"
+          multiple
+          onChange={(e) => setFiles(e.target.files)}
+          className="mt-1 block w-full text-sm"
+        />
+        <span className="mt-1 block text-xs text-slate-400">
+          Images open in the app; PDF/text/spreadsheet files download only.
+        </span>
+      </label>
+
       {error && <p className="text-sm text-red-600">{error}</p>}
       <div className="flex gap-2">
         <button

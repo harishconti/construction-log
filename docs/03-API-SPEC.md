@@ -104,6 +104,11 @@ Protected by `MAINTENANCE_SECRET` (header `x-maintenance-secret` or `Authorizati
 `CRON_SECRET` for Vercel Cron. Denies with 401 when no secret is configured. Intended to run on a
 schedule, not from the app UI.
 
+## System
+| Method | Path | Description | Access |
+|---|---|---|---|
+| GET | /api/health | Liveness/readiness (`{ status, db, time }`); exposes no secrets | Public |
+
 ## Validation Rules (server-side, non-negotiable)
 - `amount` > 0; `gstAmount` >= 0 and <= `amount`; `amount` is the GST-inclusive total.
 - `occurredAt` cannot be in the future (tolerate small clock skew).

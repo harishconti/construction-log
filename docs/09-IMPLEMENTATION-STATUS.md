@@ -37,14 +37,15 @@ Migrations: `init`, `attachment_parent_check`, `idempotency_response`, `object_d
 | Feed | `GET /api/projects/:id/timeline`; `GET /api/projects/:id/dashboard` |
 | Uploads | `POST /api/uploads/presign`; `POST /api/uploads/:attachmentId/finalize`; `GET /api/attachments/:id/download`; `DELETE /api/attachments/:id` |
 | Maintenance | `GET/POST /api/maintenance/cleanup` (secret-protected) |
+| System | `GET /api/health` |
 
 ## UI pages (implemented)
 `/login` (Neon Auth: email/password + Google + magic-link option) · `/projects` (list/create) · `/projects/:id`
-(Dashboard + chart) · `/transactions` (admin soft-delete/restore + "show deleted") · `/diary`
-(author/admin edit, admin delete) · `/budgets` · `/members` (admin) · `/settings` (admin, project +
-categories). Attachments render as image thumbnails (lightbox) or document download chips; document
-uploads accepted on both diary and transactions.
-Nav: mobile bottom tabs / desktop sidebar; admin-only links for Members and Settings.
+(Dashboard + chart) · `/transactions` (filters, pagination, add/edit, admin soft-delete/restore) ·
+`/timeline` · `/diary` (author/admin edit with add/remove photos, admin delete) · `/budgets` ·
+`/more` (mobile menu) · `/members` (admin) · `/settings` (admin, project + categories).
+Attachments render as image thumbnails (lightbox) or document download chips, with inline remove.
+Nav: desktop sidebar; mobile bottom tabs (Dashboard/Transactions/Diary) + **More**.
 PWA: `manifest.json` + service worker (`public/sw.js`, registered in production).
 
 ## Behaviour implemented

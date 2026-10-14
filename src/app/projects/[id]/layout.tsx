@@ -8,9 +8,13 @@ export const dynamic = 'force-dynamic';
 const NAV = [
   { href: '', label: 'Dashboard' },
   { href: '/transactions', label: 'Transactions' },
+  { href: '/timeline', label: 'Timeline' },
   { href: '/diary', label: 'Diary' },
   { href: '/budgets', label: 'Budgets' },
 ];
+
+// Tabs shown directly in the mobile bottom bar; everything else lives under "More".
+const MOBILE_TABS = ['', '/transactions', '/diary'];
 
 export default async function ProjectLayout({
   children,
@@ -34,6 +38,9 @@ export default async function ProjectLayout({
     membership.role === 'admin'
       ? [...NAV, { href: '/members', label: 'Members' }, { href: '/settings', label: 'Settings' }]
       : NAV;
+
+  const mobileNav = nav.filter((item) => MOBILE_TABS.includes(item.href));
+  const hasMore = nav.some((item) => !MOBILE_TABS.includes(item.href));
 
   return (
     <div className="min-h-screen sm:flex">
@@ -66,7 +73,7 @@ export default async function ProjectLayout({
       </div>
 
       <nav className="fixed inset-x-0 bottom-0 flex border-t border-slate-200 bg-white sm:hidden">
-        {nav.slice(0, 4).map((item) => (
+        {mobileNav.map((item) => (
           <Link
             key={item.href}
             href={`${base}${item.href}`}
@@ -75,6 +82,11 @@ export default async function ProjectLayout({
             {item.label}
           </Link>
         ))}
+        {hasMore && (
+          <Link href={`${base}/more`} className="flex-1 py-3 text-center text-xs text-slate-600">
+            More
+          </Link>
+        )}
       </nav>
     </div>
   );

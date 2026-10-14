@@ -23,6 +23,8 @@ src/app/            Next.js App Router (pages + /api route handlers)
 src/components/     Client components (forms, views, charts)
 src/lib/            Server logic: prisma, auth, requireRole, audit, r2, idempotency, period, budget…
 prisma/             schema.prisma, seed.ts, migrations/
+scripts/            db-backup.mjs, db-restore.mjs
 tests/              Vitest unit tests
+.github/workflows/  CI (lint, typecheck, test, build)
 docs/               This folder
 ```
