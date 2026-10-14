@@ -146,6 +146,9 @@ Do not guess the Vercel target and do not reuse Railway CNAME/TXT instructions. 
 - [ ] Before launch create construction-ledger-prod, also private.
 - [ ] Keep public r2.dev access disabled.
 - [ ] Do not attach public image domains.
+- [ ] Do **not** add an R2 **Custom Domain** — that is for serving a bucket publicly and will
+      conflict with the app hostname (e.g. `www.harishspace.in` already points at Vercel). Use the
+      bucket's **CORS policy** instead (§6.3); access is via presigned URLs.
 - [ ] Review object retention/deletion policies before applying lifecycle rules.
 
 ### 6.2 Credentials
