@@ -16,6 +16,29 @@ export default function LoginPage() {
   const [notice, setNotice] = useState<string | null>(null);
   const [pending, setPending] = useState(false);
   const [magicPending, setMagicPending] = useState(false);
+  const [socialPending, setSocialPending] = useState(false);
+
+  async function signInWithGoogle() {
+    setError(null);
+    setNotice(null);
+    setSocialPending(true);
+    try {
+      const result = await authClient.signIn.social({
+        provider: 'google',
+        callbackURL: `${window.location.origin}/projects`,
+      });
+      const url = (result as { data?: { url?: string } })?.data?.url;
+      if (result?.error) {
+        setError(result.error.message ?? 'Google sign-in failed');
+      } else if (url) {
+        window.location.href = url;
+      }
+    } catch (err) {
+      setError(err instanceof Error ? err.message : 'Google sign-in failed');
+    } finally {
+      setSocialPending(false);
+    }
+  }
 
   async function handleSubmit(e: React.FormEvent) {
     e.preventDefault();
@@ -136,6 +159,23 @@ export default function LoginPage() {
             {pending ? 'Please wait…' : mode === 'sign-in' ? 'Sign in' : 'Create account'}
           </button>
         </form>
+
+        <div className="mt-4 border-t border-slate-100 pt-4">
+          <button
+            type="button"
+            onClick={signInWithGoogle}
+            disabled={socialPending}
+            className="flex w-full items-center justify-center gap-2 rounded-lg border border-slate-300 py-2 text-sm font-medium text-slate-700 hover:bg-slate-50 disabled:opacity-60"
+          >
+            <svg width="18" height="18" viewBox="0 0 48 48" aria-hidden="true">
+              <path fill="#FFC107" d="M43.6 20.5H24v7.1h11.3C33.7 32.9 29.4 36 24 36c-6.6 0-12-5.4-12-12s5.4-12 12-12c3.1 0 5.9 1.2 8 3.1l5-5C33.5 6.9 29 5 24 5 13 5 4 14 4 25s9 20 20 20c11 0 19-8 19-20 0-1.5-.2-3-.4-4.5z" />
+              <path fill="#FF3D00" d="M6.3 15.3l5.8 4.3C13.7 16 18.5 13 24 13c3.1 0 5.9 1.2 8 3.1l5-5C33.5 6.9 29 5 24 5 16.3 5 9.7 9.3 6.3 15.3z" />
+              <path fill="#4CAF50" d="M24 45c5.2 0 9.9-2 13.4-5.2l-6.2-5.2C29.3 36 26.8 36 24 36c-5.3 0-9.7-3.4-11.3-8.1l-6.2 4.8C9.7 40.5 16.3 45 24 45z" />
+              <path fill="#1976D2" d="M43.6 20.5H24v7.1h11.3c-.8 2.3-2.3 4.2-4.1 5.6l6.2 5.2C41.2 34.9 44 30.4 44 25c0-1.5-.2-3-.4-4.5z" />
+            </svg>
+            {socialPending ? 'Redirecting…' : 'Continue with Google'}
+          </button>
+        </div>
 
         {mode === 'sign-in' && (
           <div className="mt-4 border-t border-slate-100 pt-4">

@@ -39,7 +39,7 @@ Migrations: `init`, `attachment_parent_check`, `idempotency_response`, `object_d
 | Maintenance | `GET/POST /api/maintenance/cleanup` (secret-protected) |
 
 ## UI pages (implemented)
-`/login` (Neon Auth: password + magic-link option) · `/projects` (list/create) · `/projects/:id`
+`/login` (Neon Auth: email/password + Google + magic-link option) · `/projects` (list/create) · `/projects/:id`
 (Dashboard + chart) · `/transactions` (admin soft-delete/restore + "show deleted") · `/diary`
 (author/admin edit, admin delete) · `/budgets` · `/members` (admin) · `/settings` (admin, project +
 categories). Attachments render as image thumbnails (lightbox) or document download chips; document

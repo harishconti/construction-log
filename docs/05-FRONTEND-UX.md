@@ -18,6 +18,9 @@
 ## Auth UI
 - Sign-in / sign-up is provided by **Neon Auth** (`@neondatabase/auth` client through the same-origin
   `/api/auth` proxy). No custom password forms or storage.
+- **Google**: a "Continue with Google" button calls `signIn.social({ provider: 'google', callbackURL })`.
+  Enabled on the branch with **shared keys** (dev). Production needs your own Google OAuth app and the
+  app origin in the provider's authorized redirect URIs + Neon Auth trusted origins.
 - **Magic link**: the login page offers "Email me a magic link" (`signIn.magicLink({ email, callbackURL })`).
   Requires the magic-link plugin to be **enabled on the Neon Auth branch**; until then the endpoint
   returns 404 and the UI surfaces the error.

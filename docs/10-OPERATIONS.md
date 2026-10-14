@@ -62,8 +62,9 @@ Verified 14 Oct 2026: backup uploaded; restore into a throwaway Neon database re
 
 ## 4. Expanding users (onboarding) — note
 Use this if the ledger grows beyond the initial admin:
-1. **Sign-up**: each person signs up via the login page (Neon Auth). To stop open registration, disable
-   sign-up in **Neon Console → Auth → settings** once your accounts exist; then create accounts deliberately.
+1. **Sign-up / sign-in**: each person signs in via the login page — email+password, **Continue with Google**,
+   or a magic link. To stop open registration, disable sign-up in **Neon Console → Auth → settings** once
+   your accounts exist; then create accounts deliberately.
 2. **Add to a project**: the project creator is the first **admin**. Members screen → add by email + role.
    If the person already has an account they're added immediately; otherwise a **pending invitation** is
    stored and applied automatically on their first sign-in. Pending invitations can be cancelled.
@@ -73,7 +74,13 @@ Use this if the ledger grows beyond the initial admin:
 5. **Future self-serve onboarding** would need an invite-by-email flow (mailer + accept-invitation route)
    and possibly an organization model — not built.
 
-## 5. Optional hardening (not implemented)
+## 5. Identity for production
+- **Google**: the branch uses **shared Google keys** (dev only). For production, create your own Google
+  OAuth app and set it on the branch; add the app origin to the provider's authorized redirect URIs.
+- **Email**: Neon's **shared SMTP** (`auth@mail.myneon.app`) is used in dev. Production should use custom
+  SMTP for reliable verification/reset delivery.
+
+## 6. Optional hardening (not implemented)
 - Malware/AV scan hook on finalize.
 - Magic-byte content sniffing to reject mismatched file types (defence in depth).
 - Separate restricted runtime vs migration DB credentials.
