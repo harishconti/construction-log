@@ -63,16 +63,16 @@ PWA: `manifest.json` + service worker (`public/sw.js`, registered in production)
 - **Maintenance**: reaps `pending` uploads older than 24h and retries deferred R2 deletions (attempt cap + TTL).
 
 ## Verification
-- `npm run typecheck`, `npm run lint`, `npm test` (**102 unit tests**: roles, validation, period/budget
+- `npm run typecheck`, `npm run lint`, `npm test` (**104 unit tests**: roles, validation, period/budget
   math, maintenance auth, file policy, audit regressions, API error mapping/pagination, API client,
   INR/IST formatting, and server guards — `requireRole`, rate limit, audit write, idempotency,
   attachment linking, user-mirror first-sign-in race — with Prisma mocked), `npm run build` — all green.
 - **Playwright e2e** (`npm run test:e2e`, runs in CI): public tier on desktop + Pixel 7 — login UI,
   axe WCAG A/AA in light and dark, auth redirects, every API route → 401, maintenance secret, health
   shape, security headers/CSP, PWA manifest/icons, service worker (84 tests, all passing). Authed tier
-  (`e2e/authed/`, project/expense/diary flows, version conflict, idempotency, GST rule, no sideways
-  scroll on mobile) is opt-in via
-  `E2E_ALLOW_WRITES=1` and must target a non-production Neon branch.
+  (`e2e/authed/`: project/expense/diary flows, version conflict, idempotency, GST rule, no sideways
+  scroll on mobile, soft-delete exclusion from totals + restore, budget upsert/variance status/
+  revisions, invitations, last-admin guard) is opt-in via `E2E_ALLOW_WRITES=1` and must target a non-production Neon branch.
 - Manual e2e against a real Neon project + R2 bucket: auth sign-up/session; project/category/transaction/
   diary/budget CRUD; optimistic-lock 409; idempotent replay; two-phase upload (PUT→finalize→link);
   attachment delete; budgets variance + revision history; timeline merge; dashboard totals; cleanup
