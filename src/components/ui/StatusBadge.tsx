@@ -20,13 +20,14 @@ export function StatusBadge({ status }: { status: BudgetStatus }) {
   );
 }
 
-export function ProgressBar({ percent, status }: { percent: number; status: BudgetStatus }) {
+export function ProgressBar({ percent, status, label }: { percent: number; status: BudgetStatus; label: string }) {
   const width = Math.min(100, Math.max(0, percent));
   const color = status === 'red' ? 'var(--danger)' : status === 'yellow' ? 'var(--warn)' : 'var(--ok)';
   return (
     <div
       className="h-2 w-full overflow-hidden rounded-full bg-surface-2"
       role="progressbar"
+      aria-label={label}
       aria-valuenow={Math.round(percent)}
       aria-valuemin={0}
       aria-valuemax={100}
