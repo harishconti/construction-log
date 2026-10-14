@@ -77,6 +77,12 @@ member of project A cannot read or write project B.
 - **Rate limits** (fixed window, per user) apply to `POST /api/uploads/presign` (120/min),
   transaction creates (120/min), diary creates (60/min) and member invites (60/hour); exceeding returns
   `429 RATE_LIMITED`.
+- **Dates**: a bare `YYYY-MM-DD` (`startDate`, `occurredAt`, `entryDate`, `periodStart`) is an IST
+  calendar date, stored as 00:00 Asia/Kolkata; full ISO timestamps are taken as-is. Impossible dates
+  (e.g. `2026-02-30`) → 422.
+- **Slow database**: if a write's transaction expires (Prisma P2028, e.g. a cold Neon compute) the
+  write is rolled back and the API returns `503 TRANSACTION_TIMEOUT`; retrying with the same
+  `Idempotency-Key` is safe.
 - **Allowed types**: inline-viewable raster images (`image/jpeg|png|webp|gif`); download-only
   (`application/pdf`, `text/plain`, `text/csv`, `application/vnd.ms-excel` (xls),
   `…spreadsheetml.sheet` (xlsx), `image/heic|heif`). Active types (`text/html`, `image/svg+xml`,

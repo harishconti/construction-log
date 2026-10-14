@@ -37,6 +37,14 @@ describe('errorResponse', () => {
     });
   });
 
+  it('maps an expired interactive transaction (P2028) to a retryable 503, not a 500', async () => {
+    // The transaction was rolled back, so retrying (with the same Idempotency-Key) is safe.
+    expect(await body(errorResponse(prismaError('P2028')))).toEqual({
+      status: 503,
+      json: { error: 'The database was slow to respond, please retry', code: 'TRANSACTION_TIMEOUT' },
+    });
+  });
+
   it('maps zod errors to 422 with the failing path in the message', async () => {
     const result = z.object({ amount: z.number() }).safeParse({ amount: 'x' });
     const res = await body(errorResponse(result.success ? null : result.error));

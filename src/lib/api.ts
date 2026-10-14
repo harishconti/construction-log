@@ -47,6 +47,13 @@ export function errorResponse(err: unknown): NextResponse<ApiErrorBody> {
     if (err.code === 'P2025') {
       return NextResponse.json({ error: 'Not found', code: 'NOT_FOUND' }, { status: 404 });
     }
+    if (err.code === 'P2028') {
+      // Interactive transaction expired and was rolled back: nothing was written, so a retry is safe.
+      return NextResponse.json(
+        { error: 'The database was slow to respond, please retry', code: 'TRANSACTION_TIMEOUT' },
+        { status: 503 },
+      );
+    }
     if (err.code === 'P2034') {
       return NextResponse.json(
         { error: 'Conflicting write, please retry', code: 'WRITE_CONFLICT' },
