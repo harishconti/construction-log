@@ -7,7 +7,11 @@ const securityHeaders = [
   { key: 'X-Content-Type-Options', value: 'nosniff' },
   { key: 'X-Frame-Options', value: 'DENY' },
   { key: 'Referrer-Policy', value: 'strict-origin-when-cross-origin' },
-  { key: 'Permissions-Policy', value: 'camera=(self), microphone=(), geolocation=()' },
+  {
+    key: 'Permissions-Policy',
+    // geolocation is allowed for the optional "use my location" project geotag (browser prompt).
+    value: 'camera=(self), microphone=(), geolocation=(self)',
+  },
   ...(isProd
     ? [{ key: 'Strict-Transport-Security', value: 'max-age=63072000; includeSubDomains' }]
     : []),

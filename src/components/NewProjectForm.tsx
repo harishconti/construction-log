@@ -8,6 +8,7 @@ import { Button } from '@/components/ui/Button';
 import { Sheet } from '@/components/ui/Sheet';
 import { Alert } from '@/components/ui/Alert';
 import { DateInput, Field, TextInput, Textarea } from '@/components/ui/inputs';
+import { EMPTY_LOCATION, LocationFields, type LocationValue } from '@/components/LocationFields';
 import { todayIST } from '@/lib/period';
 
 export function NewProjectForm() {
@@ -16,6 +17,7 @@ export function NewProjectForm() {
   const [name, setName] = useState('');
   const [description, setDescription] = useState('');
   const [startDate, setStartDate] = useState(() => todayIST());
+  const [location, setLocation] = useState<LocationValue>(EMPTY_LOCATION);
   const [pending, setPending] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
@@ -28,9 +30,13 @@ export function NewProjectForm() {
         name,
         description: description || null,
         startDate, // bare YYYY-MM-DD: the server reads it as an IST calendar date
+        locationName: location.locationName.trim() || null,
+        latitude: location.latitude,
+        longitude: location.longitude,
       });
       setName('');
       setDescription('');
+      setLocation(EMPTY_LOCATION);
       setOpen(false);
       router.push(`/projects/${project.id}`);
       router.refresh();
@@ -72,6 +78,7 @@ export function NewProjectForm() {
           <Field label="Start date">
             <DateInput value={startDate} max={todayIST()} onChange={(e) => setStartDate(e.target.value)} />
           </Field>
+          <LocationFields value={location} onChange={setLocation} />
           {error && <Alert message={error} />}
         </form>
       </Sheet>

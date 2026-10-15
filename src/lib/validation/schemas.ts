@@ -2,6 +2,7 @@ import { z } from 'zod';
 import { isAllowedMime, sizeLimitFor } from '../files';
 import { ROLES } from '../roles';
 import { CALENDAR_DATE, istDateToInstant } from '../period';
+import { CONSENT_PURPOSE_KEYS, POLICY_VERSION, missingRequiredPurposes } from '../legal';
 
 export const paymentModeSchema = z.enum(['cash', 'upi', 'bank', 'card', 'credit']);
 export const categoryTypeSchema = z.enum(['material', 'labour', 'tax', 'utility', 'misc']);
@@ -36,20 +37,52 @@ const moneyNonNegative = z.number().min(0).max(MAX_MONEY).refine(twoDecimals, 'A
 // Projects & members
 // ---------------------------------------------------------------------------
 
-export const createProjectSchema = z.object({
-  name: z.string().trim().min(1).max(200),
-  description: z.string().trim().max(2000).optional().nullable(),
-  startDate: dateInput,
-  status: projectStatusSchema.optional(),
-});
+/** Optional site location. Latitude/longitude are a pair; `locationName` may stand alone. */
+const locationFields = {
+  locationName: z.string().trim().max(200).optional().nullable(),
+  latitude: z.number().min(-90).max(90).optional().nullable(),
+  longitude: z.number().min(-180).max(180).optional().nullable(),
+};
 
-export const updateProjectSchema = z.object({
-  name: z.string().trim().min(1).max(200).optional(),
-  description: z.string().trim().max(2000).optional().nullable(),
-  startDate: dateInput.optional(),
-  status: projectStatusSchema.optional(),
-  version: z.number().int().min(0).optional(),
-});
+function checkCoordinatePair(
+  val: { latitude?: number | null; longitude?: number | null },
+  ctx: z.RefinementCtx,
+) {
+  const latSupplied = val.latitude !== undefined;
+  const lngSupplied = val.longitude !== undefined;
+  const latSet = val.latitude !== undefined && val.latitude !== null;
+  const lngSet = val.longitude !== undefined && val.longitude !== null;
+  if (latSupplied !== lngSupplied || latSet !== lngSet) {
+    for (const path of ['latitude', 'longitude'] as const) {
+      ctx.addIssue({
+        code: z.ZodIssueCode.custom,
+        path: [path],
+        message: 'Provide both latitude and longitude, or neither',
+      });
+    }
+  }
+}
+
+export const createProjectSchema = z
+  .object({
+    name: z.string().trim().min(1).max(200),
+    description: z.string().trim().max(2000).optional().nullable(),
+    startDate: dateInput,
+    status: projectStatusSchema.optional(),
+    ...locationFields,
+  })
+  .superRefine(checkCoordinatePair);
+
+export const updateProjectSchema = z
+  .object({
+    name: z.string().trim().min(1).max(200).optional(),
+    description: z.string().trim().max(2000).optional().nullable(),
+    startDate: dateInput.optional(),
+    status: projectStatusSchema.optional(),
+    ...locationFields,
+    version: z.number().int().min(0).optional(),
+  })
+  .superRefine(checkCoordinatePair);
 
 export const addMemberSchema = z.object({
   email: z.string().trim().toLowerCase().email().max(255),
@@ -208,6 +241,46 @@ export const finalizeAttachmentSchema = z
     message: 'An attachment can have at most one parent',
   });
 
+// ---------------------------------------------------------------------------
+// Consent & account erasure (DPDP)
+// ---------------------------------------------------------------------------
+
+export const consentPurposeSchema = z.enum(CONSENT_PURPOSE_KEYS);
+
+/**
+ * A grant of consent. `granted` is a literal `true` so an unchecked box can never be recorded as
+ * agreement, and all required purposes must be present. The `policyVersion` must match the notice
+ * currently published, so a stale form cannot record consent to a superseded version.
+ */
+export const recordConsentSchema = z
+  .object({
+    policyVersion: z.string().trim().min(1).max(40),
+    purposes: z.array(consentPurposeSchema).max(CONSENT_PURPOSE_KEYS.length),
+    granted: z.literal(true),
+  })
+  .superRefine((val, ctx) => {
+    if (val.policyVersion !== POLICY_VERSION) {
+      ctx.addIssue({
+        code: z.ZodIssueCode.custom,
+        path: ['policyVersion'],
+        message: 'The terms have changed — please review the latest version',
+      });
+    }
+    if (missingRequiredPurposes(val.purposes).length > 0) {
+      ctx.addIssue({
+        code: z.ZodIssueCode.custom,
+        path: ['purposes'],
+        message: 'All required consents must be accepted',
+      });
+    }
+  });
+
+/** A request to erase the account; `confirm` guards against an accidental POST. */
+export const requestDeletionSchema = z.object({
+  confirm: z.literal(true),
+  reason: z.string().trim().max(500).optional().nullable(),
+});
+
 export type CreateProjectInput = z.infer<typeof createProjectSchema>;
 export type UpdateProjectInput = z.infer<typeof updateProjectSchema>;
 export type AddMemberInput = z.infer<typeof addMemberSchema>;
@@ -221,3 +294,5 @@ export type CreateBudgetInput = z.infer<typeof createBudgetSchema>;
 export type UpdateBudgetInput = z.infer<typeof updateBudgetSchema>;
 export type PresignInput = z.infer<typeof presignSchema>;
 export type FinalizeAttachmentInput = z.infer<typeof finalizeAttachmentSchema>;
+export type RecordConsentInput = z.infer<typeof recordConsentSchema>;
+export type RequestDeletionInput = z.infer<typeof requestDeletionSchema>;

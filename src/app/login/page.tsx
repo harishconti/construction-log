@@ -1,6 +1,7 @@
 'use client';
 
 import { Suspense, useEffect, useState } from 'react';
+import Link from 'next/link';
 import { useRouter, useSearchParams } from 'next/navigation';
 import { Loader2, Mail } from 'lucide-react';
 import { GoogleIcon } from '@/components/icons/GoogleIcon';
@@ -36,6 +37,10 @@ function LoginForm() {
   const [name, setName] = useState('');
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
+  // DPDP: a new account must give clear, affirmative consent. The checkbox gates both the
+  // email/password sign-up and the Google sign-up; the authoritative record is written by the
+  // consent gate right after sign-in.
+  const [agreed, setAgreed] = useState(false);
   const [error, setError] = useState<string | null>(
     signInFailed ? 'We couldn’t finish signing you in. Please try again.' : null,
   );
@@ -53,18 +58,25 @@ function LoginForm() {
   }, [finishing, params, next]);
 
   // Absolute URLs for the auth server: where to land after OAuth / magic link, and on failure.
+  // A brand-new social user is sent through the consent gate before reaching the app.
   const completeUrl = () => `${window.location.origin}${authCompletePath(next)}`;
+  const newUserUrl = () =>
+    `${window.location.origin}${authCompletePath(`/consent?next=${encodeURIComponent(next)}`)}`;
   const errorUrl = () => `${window.location.origin}/login?oauth_error=1&next=${encodeURIComponent(next)}`;
 
   async function signInWithGoogle() {
     setError(null);
     setNotice(null);
+    if (mode === 'sign-up' && !agreed) {
+      setError('Please accept the Terms and Privacy Policy to continue.');
+      return;
+    }
     setSocialPending(true);
     try {
       const result = await authClient.signIn.social({
         provider: 'google',
         callbackURL: completeUrl(),
-        newUserCallbackURL: completeUrl(),
+        newUserCallbackURL: newUserUrl(),
         errorCallbackURL: errorUrl(),
       });
       const url = (result as { data?: { url?: string } })?.data?.url;
@@ -81,12 +93,24 @@ function LoginForm() {
     e.preventDefault();
     setError(null);
     setNotice(null);
+    if (mode === 'sign-up' && !agreed) {
+      setError('Please accept the Terms and Privacy Policy to continue.');
+      return;
+    }
     setPending(true);
     try {
-      const result =
-        mode === 'sign-up'
-          ? await authClient.signUp.email({ email, password, name })
-          : await authClient.signIn.email({ email, password });
+      if (mode === 'sign-up') {
+        const result = await authClient.signUp.email({ email, password, name });
+        if (result?.error) {
+          setError(result.error.message ?? 'Authentication failed');
+          return;
+        }
+        // New accounts go through the consent gate before reaching any project data.
+        router.push(`/consent?next=${encodeURIComponent(next)}`);
+        router.refresh();
+        return;
+      }
+      const result = await authClient.signIn.email({ email, password });
       if (result?.error) {
         setError(result.error.message ?? 'Authentication failed');
         return;
@@ -158,7 +182,13 @@ function LoginForm() {
         </div>
 
         <div className="mt-4">
-          <Button variant="secondary" className="w-full" loading={socialPending} onClick={signInWithGoogle}>
+          <Button
+            variant="secondary"
+            className="w-full"
+            loading={socialPending}
+            disabled={mode === 'sign-up' && !agreed}
+            onClick={signInWithGoogle}
+          >
             {!socialPending && <GoogleIcon />}
             {mode === 'sign-up' ? 'Sign up with Google' : 'Sign in with Google'}
           </Button>
@@ -198,6 +228,28 @@ function LoginForm() {
             />
           </Field>
 
+          {mode === 'sign-up' && (
+            <label className="flex min-h-11 cursor-pointer items-start gap-2 text-sm text-ink-2">
+              <input
+                type="checkbox"
+                className="mt-1 h-5 w-5 shrink-0 accent-[var(--primary)]"
+                checked={agreed}
+                onChange={(e) => setAgreed(e.target.checked)}
+              />
+              <span>
+                I agree to the{' '}
+                <Link href="/terms" className="text-primary underline">
+                  Terms of Service
+                </Link>{' '}
+                and{' '}
+                <Link href="/privacy" className="text-primary underline">
+                  Privacy Policy
+                </Link>
+                , and consent to the processing of my data as described.
+              </span>
+            </label>
+          )}
+
           {error && <Alert message={error} />}
           {notice && (
             <p role="status" className="rounded-md bg-ok-tint px-3 py-2 text-sm text-ok">
@@ -205,7 +257,7 @@ function LoginForm() {
             </p>
           )}
 
-          <Button type="submit" className="w-full" loading={pending}>
+          <Button type="submit" className="w-full" loading={pending} disabled={mode === 'sign-up' && !agreed}>
             {mode === 'sign-in' ? 'Sign in' : 'Create account'}
           </Button>
         </form>
@@ -221,6 +273,22 @@ function LoginForm() {
             {magicPending ? 'Sending…' : 'Email me a sign-in link'}
           </button>
         )}
+
+        <p className="mt-4 text-center text-xs text-ink-3">
+          By continuing you agree to our{' '}
+          <Link href="/terms" className="text-primary underline">
+            Terms of Service
+          </Link>{' '}
+          and{' '}
+          <Link href="/privacy" className="text-primary underline">
+            Privacy Policy
+          </Link>
+          . See the{' '}
+          <Link href="/blog" className="text-primary underline">
+            guides
+          </Link>{' '}
+          for how to use the app.
+        </p>
       </div>
     </main>
   );

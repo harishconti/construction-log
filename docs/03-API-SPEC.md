@@ -38,6 +38,8 @@ member of project A cannot read or write project B.
 - The project creator becomes its **admin**. New sign-ups receive **no automatic membership**; an admin
   adds them by email (existing account → membership now; new email → pending invitation that applies on
   first sign-in). The **last admin** cannot be removed or demoted.
+- **Location** is optional: `locationName`, `latitude`, `longitude` on create and PATCH. Latitude and
+  longitude travel as a pair (both set or both `null`; `422` otherwise) and are bounded to ±90 / ±180.
 
 ## Categories
 | Method | Path | Description | Min Role |
@@ -112,10 +114,24 @@ member of project A cannot read or write project B.
 - **Timeline** uses keyset (cursor) pagination on `(date, id)`: pass `limit` and, to page, the opaque
   `before` cursor returned as `nextCursor`. Response is `{ items, nextCursor, hasMore }` (no total/cap).
 
+## Consent & Account (DPDP)
+| Method | Path | Description | Access |
+|---|---|---|---|
+| GET | /api/consent | Current consent + the published notice (`policyVersion`, itemised `purposes`) | Any signed-in |
+| POST | /api/consent | Record a consent grant `{ policyVersion, purposes[], granted: true }`; append-only (withdraws the previous active row). 422 on a stale version or a missing required purpose | Any signed-in |
+| GET | /api/account/deletion | The account's erasure request + `graceDays` | Any signed-in |
+| POST | /api/account/deletion | Request erasure `{ confirm: true, reason? }`; scheduled `DELETION_GRACE_DAYS` ahead. Idempotent (201 create / 200 existing) | Any signed-in |
+| DELETE | /api/account/deletion | Cancel a pending erasure request (idempotent) | Any signed-in |
+
+- The app shell sends a signed-in user with no consent for the current `POLICY_VERSION` to `/consent`.
+- Erasure runs from the maintenance job once the grace period elapses; it anonymises the account
+  (name/email overwritten, `deletedAt` set), deletes the projects the user solely owned (queueing their
+  R2 objects) and promotes the longest-standing member of a shared project whose last admin left.
+
 ## Maintenance
 | Method | Path | Description | Access |
 |---|---|---|---|
-| GET/POST | /api/maintenance/cleanup | Reap stale `pending` uploads (>24h) and retry deferred R2 deletions | Shared secret |
+| GET/POST | /api/maintenance/cleanup | Reap stale `pending` uploads (>24h), retry deferred R2 deletions and process due account-erasure requests | Shared secret |
 
 Protected by `MAINTENANCE_SECRET` (header `x-maintenance-secret` or `Authorization: Bearer`), or
 `CRON_SECRET` for Vercel Cron. Denies with 401 when no secret is configured. Intended to run on a
@@ -142,11 +158,13 @@ All errors return `{ error: string, code: string }` with an appropriate HTTP sta
 (400/401/403/404/409/422/500).
 
 ## Implementation Status
-Implemented: Neon Auth proxy; projects/members/categories; transactions (list/create/update/delete/
-restore) with two-phase R2 upload linking, editor-any edits, optimistic locking and idempotency;
-diary (list/create/update/delete) with multi-file linking; budgets (list with derived actual +
-variance, create/upsert, revise with revision history); timeline; dashboard; maintenance cleanup;
-attachment policy (type allowlist, size caps) with app-proxied downloads for non-images.
+Implemented: Neon Auth proxy; projects/members/categories (with optional project location/geotag);
+transactions (list/create/update/delete/restore) with two-phase R2 upload linking, editor-any edits,
+optimistic locking and idempotency; diary (list/create/update/delete) with multi-file linking; budgets
+(list with derived actual + variance, create/upsert, revise with revision history); timeline; dashboard;
+consent + account-erasure endpoints (DPDP); maintenance cleanup (stale uploads, R2 deletion retries, due
+erasure requests); attachment policy (type allowlist, size caps) with app-proxied downloads for
+non-images. Public pages: Terms, Privacy and the blog/guides.
 
 Pending: magic-link activation on the branch; Neon Auth trusted-origin configuration; R2 CORS;
 production `prisma migrate deploy` release process.

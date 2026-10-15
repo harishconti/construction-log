@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { formatDate, formatDayLabel, formatINR, formatWeekRange } from '../src/lib/format';
+import { formatCoords, formatDate, formatDayLabel, formatINR, formatWeekRange, mapUrl } from '../src/lib/format';
 
 describe('formatINR', () => {
   it('uses Indian digit grouping with no paise', () => {
@@ -56,5 +56,18 @@ describe('formatWeekRange', () => {
 
   it('names both months when the week spans two', () => {
     expect(formatWeekRange('2026-09-27T18:30:00.000Z', '2026-10-04T18:30:00.000Z')).toBe('28 Sept – 4 Oct');
+  });
+});
+
+describe('coordinates', () => {
+  it('formats six decimal places', () => {
+    expect(formatCoords(12.9716, 77.5946)).toBe('12.971600, 77.594600');
+    expect(formatCoords(0, 0)).toBe('0.000000, 0.000000');
+  });
+
+  it('builds an OpenStreetMap link', () => {
+    expect(mapUrl(12.9716, 77.5946)).toBe(
+      'https://www.openstreetmap.org/?mlat=12.9716&mlon=77.5946#map=15/12.9716/77.5946',
+    );
   });
 });

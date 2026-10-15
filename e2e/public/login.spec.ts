@@ -25,6 +25,22 @@ test.describe('login page', () => {
     await expect(page.getByRole('button', { name: 'Email me a sign-in link' })).toHaveCount(0);
   });
 
+  test('sign-up requires the DPDP consent checkbox before the account buttons enable', async ({ page }) => {
+    await page.getByRole('tab', { name: 'Sign up' }).click();
+    const create = page.getByRole('button', { name: 'Create account' });
+    const google = page.getByRole('button', { name: 'Sign up with Google' });
+    await expect(create).toBeDisabled();
+    await expect(google).toBeDisabled();
+    await page.getByRole('checkbox').check();
+    await expect(create).toBeEnabled();
+    await expect(google).toBeEnabled();
+  });
+
+  test('links to the Terms of Service and Privacy Policy', async ({ page }) => {
+    await expect(page.getByRole('link', { name: 'Terms of Service' })).toHaveAttribute('href', '/terms');
+    await expect(page.getByRole('link', { name: 'Privacy Policy' })).toHaveAttribute('href', '/privacy');
+  });
+
   test('Google buttons show the Google logo; magic link shows a mail icon', async ({ page }) => {
     const google = page.getByRole('button', { name: 'Sign in with Google' });
     await expect(google.locator('svg path')).toHaveCount(4); // the four-colour "G"

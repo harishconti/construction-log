@@ -19,10 +19,11 @@ datasource db {
 }
 
 model User {
-  id        String   @id // Neon Auth user id (mirrored locally for FK integrity)
+  id        String    @id // Neon Auth user id (mirrored locally for FK integrity)
   name      String
-  email     String   @unique
-  createdAt DateTime @default(now())
+  email     String    @unique
+  createdAt DateTime  @default(now())
+  deletedAt DateTime? // set when the account is anonymised after a DPDP erasure request
 
   memberships    ProjectMember[]
   transactions   Transaction[]
@@ -34,6 +35,8 @@ model User {
   invitationsSent Invitation[]    @relation("InvitationInviter")
   inviteLinksCreated InviteLink[] @relation("InviteLinkCreator")
   inviteLinksUsed    InviteLink[] @relation("InviteLinkUser")
+  consents       ConsentRecord[]
+  deletionRequests DeletionRequest[]
 }
 
 model Project {
@@ -42,6 +45,9 @@ model Project {
   description String?
   startDate   DateTime
   status      String   @default("active") // active | paused | completed
+  locationName String? // human-readable site location, optional
+  latitude    Float?   // site coordinates, optional (set/cleared together with `longitude`)
+  longitude   Float?
   version     Int      @default(0)
   createdBy   String
   createdAt   DateTime @default(now())
@@ -280,4 +286,41 @@ model RateLimit {
 
   @@unique([bucket, windowStart])
   @@index([windowStart])
+}
+
+/// Append-only DPDP consent record: one row per grant of consent to a policy version. Re-consenting
+/// (a new policy version, or toggling an optional purpose) withdraws the previous active row and
+/// inserts a new one, so the full consent history is kept. The newest non-withdrawn row for the
+/// current `policyVersion` is the active consent.
+model ConsentRecord {
+  id            String    @id @default(cuid())
+  userId        String
+  policyVersion String // e.g. "2026-10-15"
+  purposes      Json // string[] of granted purpose keys (see src/lib/legal.ts)
+  grantedAt     DateTime  @default(now())
+  withdrawnAt   DateTime?
+  userAgent     String? // evidence of the clear affirmative action at the time of consent
+  ip            String?
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([userId, grantedAt])
+}
+
+/// A Data Principal's request to erase their account and personal data (DPDP right to erasure).
+/// Scheduled `DELETION_GRACE_DAYS` ahead so it can be cancelled; processed by the cleanup job once
+/// due, which anonymises the User row and removes the projects the user solely owned.
+model DeletionRequest {
+  id           String    @id @default(cuid())
+  userId       String
+  status       String    @default("pending") // 'pending' | 'cancelled' | 'completed' (DB CHECK)
+  reason       String?
+  requestedAt  DateTime  @default(now())
+  scheduledFor DateTime
+  completedAt  DateTime?
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([status, scheduledFor])
+  @@index([userId, status])
 }

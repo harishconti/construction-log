@@ -1,9 +1,10 @@
 import Link from 'next/link';
+import { MapPin } from 'lucide-react';
 import { DashboardChart, type ChartDatum } from '@/components/DashboardChart';
 import { StatusBadge, ProgressBar, type BudgetStatus } from '@/components/ui/StatusBadge';
 import { EmptyState } from '@/components/ui/EmptyState';
 import { computeVariance } from '@/lib/budget';
-import { formatDate, formatDayLabel, formatINR } from '@/lib/format';
+import { formatCoords, formatDate, formatDayLabel, formatINR, mapUrl } from '@/lib/format';
 import { periodRange, startOfMonthIST } from '@/lib/period';
 import { prisma } from '@/lib/prisma';
 
@@ -16,7 +17,10 @@ export default async function ProjectDashboard({ params }: { params: Promise<{ i
   const { start, end } = periodRange('month', periodStart);
 
   const [project, totalAgg, periodAgg, grouped, budgets, categories, recent, recentDiary] = await Promise.all([
-    prisma.project.findUnique({ where: { id }, select: { name: true, startDate: true } }),
+    prisma.project.findUnique({
+      where: { id },
+      select: { name: true, startDate: true, locationName: true, latitude: true, longitude: true },
+    }),
     prisma.transaction.aggregate({ where: { projectId: id, deletedAt: null }, _sum: { amount: true }, _count: true }),
     prisma.transaction.aggregate({
       where: { projectId: id, deletedAt: null, occurredAt: { gte: start, lt: end } },
@@ -62,7 +66,25 @@ export default async function ProjectDashboard({ params }: { params: Promise<{ i
 
   return (
     <div className="space-y-6">
-      <h1 className="font-display text-2xl font-bold">Dashboard</h1>
+      <header>
+        <h1 className="font-display text-2xl font-bold">Dashboard</h1>
+        {project && (project.locationName || (project.latitude !== null && project.longitude !== null)) && (
+          <p className="mt-1 flex flex-wrap items-center gap-x-2 text-sm text-ink-3">
+            <MapPin size={14} aria-hidden className="shrink-0" />
+            {project.locationName && <span>{project.locationName}</span>}
+            {project.latitude !== null && project.longitude !== null && (
+              <a
+                href={mapUrl(project.latitude, project.longitude)}
+                target="_blank"
+                rel="noreferrer"
+                className="text-primary hover:underline"
+              >
+                {formatCoords(project.latitude, project.longitude)}
+              </a>
+            )}
+          </p>
+        )}
+      </header>
 
       {/* Hero: budget used */}
       <section className="rounded-lg bg-ink p-5 text-bg shadow-e1">

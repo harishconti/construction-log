@@ -7,9 +7,18 @@ export type AuditEntity =
   | 'project'
   | 'member'
   | 'category'
-  | 'attachment';
+  | 'attachment'
+  | 'consent'
+  | 'account';
 
-export type AuditAction = 'create' | 'update' | 'delete' | 'restore' | 'role_change' | 'finalize';
+export type AuditAction =
+  | 'create'
+  | 'update'
+  | 'delete'
+  | 'restore'
+  | 'role_change'
+  | 'finalize'
+  | 'cancel';
 
 export type AuditEntry = {
   entity: AuditEntity;

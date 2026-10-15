@@ -20,6 +20,9 @@ export const GET = handle<Ctx>(async (_req, { params: paramsPromise }) => {
       description: true,
       status: true,
       startDate: true,
+      locationName: true,
+      latitude: true,
+      longitude: true,
       createdAt: true,
       _count: {
         select: {
@@ -55,6 +58,9 @@ export const PATCH = handle<Ctx>(async (req, { params: paramsPromise }) => {
         ...(body.description !== undefined ? { description: body.description } : {}),
         ...(body.startDate !== undefined ? { startDate: body.startDate } : {}),
         ...(body.status !== undefined ? { status: body.status } : {}),
+        ...(body.locationName !== undefined ? { locationName: body.locationName } : {}),
+        ...(body.latitude !== undefined ? { latitude: body.latitude } : {}),
+        ...(body.longitude !== undefined ? { longitude: body.longitude } : {}),
         version: { increment: 1 },
       },
     });

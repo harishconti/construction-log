@@ -4,7 +4,15 @@ import { expect, test } from '@playwright/test';
 // so they are read-only and safe against any environment.
 
 test.describe('page auth gate', () => {
-  for (const path of ['/', '/projects', '/projects/any-id', '/projects/any-id/transactions', '/projects/any-id/settings']) {
+  for (const path of [
+    '/',
+    '/projects',
+    '/projects/any-id',
+    '/projects/any-id/transactions',
+    '/projects/any-id/settings',
+    '/account',
+    '/consent',
+  ]) {
     test(`${path} redirects to /login when signed out`, async ({ page }) => {
       await page.goto(path);
       await expect(page).toHaveURL(/\/login/);
@@ -44,6 +52,11 @@ test.describe('API auth gate', () => {
     ['POST', `/api/projects/${pid}/invite-links`],
     ['DELETE', `/api/projects/${pid}/invite-links/l1`],
     ['POST', `/api/invite-links/${'a'.repeat(43)}/accept`],
+    ['GET', '/api/consent'],
+    ['POST', '/api/consent'],
+    ['GET', '/api/account/deletion'],
+    ['POST', '/api/account/deletion'],
+    ['DELETE', '/api/account/deletion'],
   ];
 
   for (const [method, path] of endpoints) {

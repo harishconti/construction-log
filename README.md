@@ -16,6 +16,9 @@ Neon Auth · Cloudflare R2 (private, presigned uploads) · Vercel · Vitest.
 - **Budgets**: planned vs derived actual per category, week/month, revision history.
 - **Dashboard & timeline**: budget-used hero, planned-vs-actual chart, merged activity feed.
 - **Members**: invite by email (works before the person signs up), role changes, last-admin guard.
+- **Location**: an optional site place name and geotag per project, captured on-device and editable.
+- **Privacy (DPDP)**: itemised consent at sign-up, an account & data page, and a 30-day cancellable
+  account-deletion flow — with public Terms, Privacy and a guides blog.
 - **PWA**: installable, works well on phones.
 - **Safety**: optimistic locking, idempotent creates, audit log on every write, rate limits, DB CHECK
   constraints, security headers, magic-byte checks on uploads.

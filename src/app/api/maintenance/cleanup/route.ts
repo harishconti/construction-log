@@ -2,6 +2,7 @@ import { ApiError, handle, json } from '@/lib/api';
 import { prisma } from '@/lib/prisma';
 import { deleteObjects, isR2Configured } from '@/lib/r2';
 import { WINDOW } from '@/lib/ratelimit';
+import { processDueDeletions } from '@/lib/account';
 import {
   DELETE_TTL_MS,
   IDEMPOTENCY_TTL_MS,
@@ -85,12 +86,16 @@ const run = handle(async (req) => {
     await prisma.rateLimit.deleteMany({ where: { windowStart: { lt: new Date(now - WINDOW.hour) } } })
   ).count;
 
+  // 5) Process erasure requests whose 30-day grace period has elapsed (DPDP right to erasure).
+  const deletions = await processDueDeletions(new Date(now));
+
   return json({
     cleanedAttachments: stale.length,
     deletedObjects: deleted,
     failedDeletions: failed,
     purgedKeys,
     purgedRateLimits,
+    deletions,
     at: new Date().toISOString(),
   });
 });

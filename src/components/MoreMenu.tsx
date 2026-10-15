@@ -52,6 +52,21 @@ export function MoreMenu({ items }: { items: MoreItem[] }) {
         })}
       </ul>
 
+      <nav aria-label="Account and legal" className="flex flex-wrap gap-x-5 gap-y-1 px-1 text-sm text-ink-3">
+        <Link href="/account" className="inline-flex min-h-11 items-center hover:text-ink">
+          Account &amp; data
+        </Link>
+        <Link href="/blog" className="inline-flex min-h-11 items-center hover:text-ink">
+          Guides
+        </Link>
+        <Link href="/terms" className="inline-flex min-h-11 items-center hover:text-ink">
+          Terms
+        </Link>
+        <Link href="/privacy" className="inline-flex min-h-11 items-center hover:text-ink">
+          Privacy
+        </Link>
+      </nav>
+
       <button
         type="button"
         onClick={async () => {

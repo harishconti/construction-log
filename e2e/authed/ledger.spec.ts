@@ -41,6 +41,29 @@ test('create a project (creator becomes admin, default categories seeded)', asyn
   expect(cats.categories.length).toBeGreaterThan(0);
 });
 
+test('sets, changes and clears the project location (coordinates as a pair)', async ({ request }) => {
+  const set = await request.patch(`/api/projects/${projectId}`, {
+    data: { locationName: 'Whitefield, Bengaluru', latitude: 12.9716, longitude: 77.5946 },
+  });
+  expect(set.status()).toBe(200);
+  const proj = await (await request.get(`/api/projects/${projectId}`)).json();
+  expect(proj.project.locationName).toBe('Whitefield, Bengaluru');
+  expect(proj.project.latitude).toBeCloseTo(12.9716, 5);
+
+  // One coordinate without the other is rejected.
+  const bad = await request.patch(`/api/projects/${projectId}`, { data: { latitude: 1 } });
+  expect(bad.status()).toBe(422);
+
+  const cleared = await request.patch(`/api/projects/${projectId}`, {
+    data: { locationName: null, latitude: null, longitude: null },
+  });
+  expect(cleared.status()).toBe(200);
+  const after = await (await request.get(`/api/projects/${projectId}`)).json();
+  expect(after.project.locationName).toBeNull();
+  expect(after.project.latitude).toBeNull();
+  expect(after.project.longitude).toBeNull();
+});
+
 test('add an expense from the mobile FAB', async ({ page }) => {
   await page.goto(`/projects/${projectId}/transactions`);
   await page.getByRole('button', { name: 'Add expense' }).click();

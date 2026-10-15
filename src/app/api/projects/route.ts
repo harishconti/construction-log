@@ -20,7 +20,16 @@ export const GET = handle(async () => {
     select: {
       role: true,
       project: {
-        select: { id: true, name: true, description: true, status: true, startDate: true },
+        select: {
+          id: true,
+          name: true,
+          description: true,
+          status: true,
+          startDate: true,
+          locationName: true,
+          latitude: true,
+          longitude: true,
+        },
       },
     },
   });
@@ -40,11 +49,23 @@ export const POST = handle(async (req) => {
         description: body.description ?? null,
         startDate: body.startDate,
         status: body.status ?? 'active',
+        locationName: body.locationName ?? null,
+        latitude: body.latitude ?? null,
+        longitude: body.longitude ?? null,
         createdBy: user.id,
         members: { create: { userId: user.id, role: 'admin' } },
         categories: { create: DEFAULT_CATEGORIES },
       },
-      select: { id: true, name: true, description: true, status: true, startDate: true },
+      select: {
+        id: true,
+        name: true,
+        description: true,
+        status: true,
+        startDate: true,
+        locationName: true,
+        latitude: true,
+        longitude: true,
+      },
     });
     await writeAudit(tx, {
       entity: 'project',

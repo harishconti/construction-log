@@ -1,11 +1,13 @@
 import Link from 'next/link';
 import { redirect } from 'next/navigation';
+import { MapPin } from 'lucide-react';
 import { getCurrentUser } from '@/lib/auth';
 import { prisma } from '@/lib/prisma';
+import { consentGatePath, hasCurrentConsent } from '@/lib/consent';
 import { SignOutButton } from '@/components/SignOutButton';
 import { NewProjectForm } from '@/components/NewProjectForm';
 import { EmptyState } from '@/components/ui/EmptyState';
-import { formatDayLabel, formatINR } from '@/lib/format';
+import { formatCoords, formatDayLabel, formatINR } from '@/lib/format';
 
 export const dynamic = 'force-dynamic';
 
@@ -20,13 +22,24 @@ const ROLE_LABEL: Record<string, string> = { admin: 'Admin', editor: 'Editor', v
 export default async function ProjectsPage() {
   const user = await getCurrentUser();
   if (!user) redirect('/login');
+  if (!(await hasCurrentConsent(user.id))) redirect(consentGatePath('/projects'));
 
   const memberships = await prisma.projectMember.findMany({
     where: { userId: user.id },
     orderBy: { createdAt: 'asc' },
     select: {
       role: true,
-      project: { select: { id: true, name: true, description: true, status: true } },
+      project: {
+        select: {
+          id: true,
+          name: true,
+          description: true,
+          status: true,
+          locationName: true,
+          latitude: true,
+          longitude: true,
+        },
+      },
     },
   });
 
@@ -109,6 +122,15 @@ export default async function ProjectsPage() {
                   </span>
                 </div>
                 {m.project.description && <p className="mt-1 truncate text-sm text-ink-2">{m.project.description}</p>}
+                {(m.project.locationName || (m.project.latitude !== null && m.project.longitude !== null)) && (
+                  <p className="mt-1 flex items-center gap-1 text-sm text-ink-3">
+                    <MapPin size={14} aria-hidden className="shrink-0" />
+                    <span className="truncate">
+                      {m.project.locationName ||
+                        formatCoords(m.project.latitude as number, m.project.longitude as number)}
+                    </span>
+                  </p>
+                )}
                 <dl className="mt-3 flex flex-wrap gap-x-6 gap-y-1 text-sm">
                   <div>
                     <dt className="text-xs text-ink-3">Total spend</dt>
@@ -124,6 +146,21 @@ export default async function ProjectsPage() {
           })
         )}
       </section>
+
+      <footer className="mt-8 flex flex-wrap gap-x-4 gap-y-1 border-t border-border pt-4 text-sm text-ink-3">
+        <Link href="/account" className="hover:text-ink">
+          Account &amp; data
+        </Link>
+        <Link href="/blog" className="hover:text-ink">
+          Guides
+        </Link>
+        <Link href="/terms" className="hover:text-ink">
+          Terms
+        </Link>
+        <Link href="/privacy" className="hover:text-ink">
+          Privacy
+        </Link>
+      </footer>
     </main>
   );
 }

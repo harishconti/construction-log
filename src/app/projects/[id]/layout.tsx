@@ -3,6 +3,7 @@ import { redirect } from 'next/navigation';
 import { ArrowLeft } from 'lucide-react';
 import { getCurrentUser } from '@/lib/auth';
 import { prisma } from '@/lib/prisma';
+import { consentGatePath, hasCurrentConsent } from '@/lib/consent';
 import { NavLink, type NavIcon } from '@/components/NavLink';
 import { ProjectSwitcher } from '@/components/ProjectSwitcher';
 
@@ -30,6 +31,7 @@ export default async function ProjectLayout({
   const { id } = await params;
   const user = await getCurrentUser();
   if (!user) redirect('/login');
+  if (!(await hasCurrentConsent(user.id))) redirect(consentGatePath(`/projects/${id}`));
 
   const [membership, allMemberships] = await Promise.all([
     prisma.projectMember.findUnique({

@@ -12,19 +12,23 @@ This document reflects the **actual repository state**. For the target design se
 
 ## Data model (implemented)
 `User, Project, ProjectMember, Invitation, Category, Transaction, DiaryEntry, Attachment, Budget, BudgetRevision,
-AuditLog, IdempotencyKey, ObjectDeletion, RateLimit`.
+AuditLog, IdempotencyKey, ObjectDeletion, RateLimit, ConsentRecord, DeletionRequest`.
 
 Key properties in place:
-- `User.id` = Neon Auth user id (no stored password).
+- `User.id` = Neon Auth user id (no stored password); `deletedAt` marks an anonymised (erased) account.
 - `version` on Project/Transaction/DiaryEntry/Budget (optimistic locking).
 - `Attachment`: `transactionId`/`diaryEntryId` (exactly one when attached), `status` (pending|ready), `size`.
-- DB CHECK constraints: attachment at-most-one-parent; pending has no parent; status enum.
+- DB CHECK constraints: attachment at-most-one-parent; pending has no parent; status enum; `DeletionRequest.status` enum.
 - `IdempotencyKey` stores the response for replay.
 - `ObjectDeletion` retry queue for deferred R2 deletions.
+- `ConsentRecord` — append-only DPDP consent grants (policy version, itemised purposes, evidence).
+- `DeletionRequest` — scheduled, cancellable account erasure processed by the cleanup job.
 
 Migrations: `init`, `attachment_parent_check`, `idempotency_response`, `object_deletion_queue`,
-`attachment_original_name`, `invitations`, `invitation_expiry`, `rate_limit`, `enum_checks`, `invite_links`
-(applied to the Neon `dev` branch; **apply to production before deploying** the invite-link code).
+`attachment_original_name`, `invitations`, `invitation_expiry`, `rate_limit`, `enum_checks`, `invite_links`,
+`consent_and_deletion`
+(applied to the Neon `dev` branch; **apply to production before deploying** the invite-link code and the
+DPDP consent/erasure code).
 
 ## API endpoints (implemented)
 | Area | Endpoints |
@@ -38,11 +42,16 @@ Migrations: `init`, `attachment_parent_check`, `idempotency_response`, `object_d
 | Budgets | `GET/POST /api/projects/:id/budgets`; `PATCH /api/projects/:id/budgets/:budgetId`; `GET …/revisions` |
 | Feed | `GET /api/projects/:id/timeline`; `GET /api/projects/:id/dashboard` |
 | Uploads | `POST /api/uploads/presign`; `POST /api/uploads/:attachmentId/finalize`; `GET /api/attachments/:id/download`; `DELETE /api/attachments/:id` |
+| Consent & account | `GET/POST /api/consent`; `GET/POST/DELETE /api/account/deletion` |
 | Maintenance | `GET/POST /api/maintenance/cleanup` (secret-protected) |
 | System | `GET /api/health` |
 
 ## UI pages (implemented)
-`/login` (Neon Auth: email/password + Google + magic-link option) · `/projects` (list/create) · `/projects/:id`
+`/login` (Neon Auth: email/password + Google + magic-link option; sign-up requires the DPDP consent
+checkbox) · `/terms` · `/privacy` (public legal pages) · `/blog` + `/blog/:slug` (public guides: setup,
+expenses, budgets, diary, team, use cases, data) · `/consent` (consent gate for new accounts and
+after a policy-version change) · `/account` (consent status, optional-purpose preferences and the
+account-deletion flow) · `/projects` (list/create) · `/projects/:id`
 (Dashboard + chart) · `/transactions` (filters, pagination, add/edit, admin soft-delete/restore) ·
 `/timeline` · `/diary` (author/admin edit with add/remove photos, admin delete) · `/budgets` ·
 `/more` (mobile menu) · `/members` (admin) · `/settings` (admin, project + categories).
@@ -68,19 +77,36 @@ PWA: `manifest.json` + service worker (`public/sw.js`, registered in production)
 - **Correctness**: `Idempotency-Key` on transaction/diary create; `version` optimistic locking (409 on stale); audit log written in the same Prisma transaction.
 - **Budgets**: planned vs derived actual (`SUM(amount)`), variance + status (green<80 / yellow 80–100 / red>100); revisions append-only.
 - **Time**: `Asia/Kolkata` boundaries; weeks start Monday.
-- **Maintenance**: reaps `pending` uploads older than 24h and retries deferred R2 deletions (attempt cap + TTL).
+- **Consent & erasure (DPDP, 2023)**: the app shell (`/projects`, every project page) sends a signed-in
+  user with no consent for the current `POLICY_VERSION` through `/consent`, which lists each purpose
+  (required/optional) and only records consent on an explicit affirmation. Consent is append-only
+  (`ConsentRecord`), so a version bump or an optional-purpose change re-consents and the history is kept.
+  `/account` shows consent and lets a user request erasure; the request is scheduled `DELETION_GRACE_DAYS`
+  (30) ahead and can be cancelled. The cleanup job then anonymises the account (`name`/`email`
+  overwritten, `deletedAt` set), deletes the projects the user solely owned (queueing their R2 objects)
+  and promotes the longest-standing member when a departing user was a shared project's last admin;
+  audit rows and the other members' ledger rows are retained. Terms and Privacy are published at
+  `/terms` and `/privacy`.
+- **Site location**: a project can carry an optional place name and a geotag. Coordinates are captured
+  from the browser (permission `geolocation=(self)`), stored as a pair, shown on the dashboard and the
+  project list, and linked to OpenStreetMap; editable at any time from Settings.
+- **Maintenance**: reaps `pending` uploads older than 24h, retries deferred R2 deletions (attempt cap + TTL), and processes due account-erasure requests.
 
 ## Verification
-- `npm run typecheck`, `npm run lint`, `npm test` (**129 unit tests**: roles, validation, period/budget
+- `npm run typecheck`, `npm run lint`, `npm test` (**155 unit tests**: roles, validation, period/budget
   math, maintenance auth, file policy, audit regressions, API error mapping/pagination, API client,
-  INR/IST formatting, and server guards — `requireRole`, rate limit, audit write, idempotency,
-  attachment linking, user-mirror first-sign-in race — with Prisma mocked), `npm run build` — all green.
-- **Playwright e2e** (`npm run test:e2e`, runs in CI): public tier on desktop + Pixel 7 — login UI,
-  axe WCAG A/AA in light and dark, auth redirects, every API route → 401, maintenance secret, health
-  shape, security headers/CSP, PWA manifest/icons, service worker, Google/mail icons (86 tests, all passing). Authed tier
+  INR/IST/coordinate formatting, DPDP consent schemas + erasure processing, project-location rules, and
+  server guards — `requireRole`, rate limit, audit write, idempotency, attachment linking, user-mirror
+  first-sign-in race — with Prisma mocked), `npm run build` — all green.
+- **Playwright e2e** (`npm run test:e2e`, runs in CI): public tier on desktop + Pixel 7 — login UI
+  (including the DPDP sign-up consent checkbox), axe WCAG A/AA in light and dark, auth redirects, every
+  API route → 401 (consent + account deletion included), maintenance secret, health shape, security
+  headers/CSP, PWA manifest/icons, service worker, Google/mail icons, the consent gate redirect for
+  signed-out users, and the public Terms/Privacy/Blog pages (122 passing, 4 environment-skipped).
+  Authed tier
   (`e2e/authed/`: project/expense/diary flows, version conflict, idempotency, GST rule, no sideways
   scroll on mobile, soft-delete exclusion from totals + restore, budget upsert/variance status/
-  revisions, invitations, last-admin guard, no sideways scroll or wrapped toggles at 360px, FAB never covers the last row) is opt-in via `E2E_ALLOW_WRITES=1` and must target a non-production Neon branch.
+  revisions, invitations, last-admin guard, no sideways scroll or wrapped toggles at 360px, FAB never covers the last row, and project location set/change/clear) is opt-in via `E2E_ALLOW_WRITES=1` and must target a non-production Neon branch.
 - Manual e2e against a real Neon project + R2 bucket: auth sign-up/session; project/category/transaction/
   diary/budget CRUD; optimistic-lock 409; idempotent replay; two-phase upload (PUT→finalize→link);
   attachment delete; budgets variance + revision history; timeline merge; dashboard totals; cleanup
@@ -185,8 +211,12 @@ colour); budget Revise/Set targets under 44px; long names/URLs causing sideways 
 5. **Dev/prod isolation**: a Neon `dev` branch now exists (created 15 Oct 2026, with its own Neon
    Auth) and runs the authed e2e suite. Still to do: point local `.env` at it instead of production.
 6. **Optional hardening**: malware/AV scanning on finalize; separate restricted runtime vs migration DB credentials. (Magic-byte sniffing shipped in A3.)
+7. **Legal review**: the Terms/Privacy pages and the DPDP consent notice are written from the codebase
+   and need a lawyer's review; set `NEXT_PUBLIC_LEGAL_CONTACT_EMAIL` to a monitored address and name a
+   grievance officer before wider use.
 
 ## Environment variables
 `DATABASE_URL`, `DIRECT_URL`, `NEON_AUTH_BASE_URL`, `NEON_AUTH_COOKIE_SECRET`, `NEXT_PUBLIC_APP_URL`
-(`APP_URL`), `R2_ACCOUNT_ID`, `R2_ENDPOINT`, `R2_ACCESS_KEY_ID`, `R2_SECRET_ACCESS_KEY`,
+(`APP_URL`), `NEXT_PUBLIC_LEGAL_CONTACT_EMAIL` (optional; the DPDP contact on the legal pages),
+`R2_ACCOUNT_ID`, `R2_ENDPOINT`, `R2_ACCESS_KEY_ID`, `R2_SECRET_ACCESS_KEY`,
 `R2_BUCKET`, `R2_REGION`, `MAINTENANCE_SECRET` (optional `CRON_SECRET`). See `.env.example`.

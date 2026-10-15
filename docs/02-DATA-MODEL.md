@@ -11,6 +11,7 @@ model User {
   name      String
   email     String   @unique
   createdAt DateTime @default(now())
+  deletedAt DateTime? // set when the account is anonymised after a DPDP erasure request
   // NOTE: no passwordHash — credentials are owned by Neon Auth. (to implement: drop the legacy column)
 
   memberships    ProjectMember[]
@@ -20,17 +21,22 @@ model User {
   budgetsCreated Budget[]
   uploads        Attachment[]
   projectsOwned  Project[]        @relation("ProjectCreator")
+  consents       ConsentRecord[]
+  deletionRequests DeletionRequest[]
 }
 
 model Project {
-  id          String   @id @default(cuid())
-  name        String
-  description String?
-  startDate   DateTime
-  status      String   @default("active") // active | paused | completed
-  version     Int      @default(0)        // optimistic locking (to implement)
-  createdBy   String
-  createdAt   DateTime @default(now())
+  id           String   @id @default(cuid())
+  name         String
+  description  String?
+  startDate    DateTime
+  status       String   @default("active") // active | paused | completed
+  locationName String?  // optional site place name
+  latitude     Float?   // optional geotag (set/cleared together with longitude; DB CHECK)
+  longitude    Float?
+  version      Int      @default(0)        // optimistic locking (to implement)
+  createdBy    String
+  createdAt    DateTime @default(now())
 
   creator      User            @relation("ProjectCreator", fields: [createdBy], references: [id])
   members      ProjectMember[]
@@ -197,7 +203,7 @@ model AuditLog {
   id        String   @id @default(cuid())
   entity    String   // 'transaction' | 'diary_entry' | 'budget' | 'project' | 'member' | 'category' | 'attachment'
   entityId  String
-  action    String   // 'create' | 'update' | 'delete' | 'restore' | 'role_change' | 'finalize'
+  action    String   // 'create' | 'update' | 'delete' | 'restore' | 'role_change' | 'finalize' | 'cancel'
   actorId   String
   before    Json?
   after     Json?
@@ -245,6 +251,38 @@ model RateLimit {
   @@unique([bucket, windowStart])
   @@index([windowStart])
 }
+
+/// Append-only DPDP consent grant: one row per acceptance of a policy version.
+model ConsentRecord {
+  id            String    @id @default(cuid())
+  userId        String
+  policyVersion String
+  purposes      Json      // string[] of granted purpose keys
+  grantedAt     DateTime  @default(now())
+  withdrawnAt   DateTime?
+  userAgent     String?
+  ip            String?
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([userId, grantedAt])
+}
+
+/// A Data Principal's erasure request; scheduled ahead, cancellable, processed by the cleanup job.
+model DeletionRequest {
+  id           String    @id @default(cuid())
+  userId       String
+  status       String    @default("pending") // 'pending' | 'cancelled' | 'completed' (DB CHECK)
+  reason       String?
+  requestedAt  DateTime  @default(now())
+  scheduledFor DateTime
+  completedAt  DateTime?
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([status, scheduledFor])
+  @@index([userId, status])
+}
 ```
 
 ## Key Design Decisions
@@ -271,6 +309,16 @@ model RateLimit {
 - **Optimistic locking + idempotency** — `version` columns and an `IdempotencyKey` table guard
   against silent concurrent overwrites and duplicate create/finalize retries. _(to implement)_
 - **Audit log uses JSONB** for before/after — flexible, queryable, immutable.
+- **Consent is append-only (DPDP)** — `ConsentRecord` stores the policy version, the itemised purposes
+  consented to and the evidence of the affirmative action. Re-consenting withdraws the previous row and
+  inserts a new one, so the full history survives a policy-version bump.
+- **Erasure anonymises, it does not drop the row** — `DeletionRequest` schedules erasure (cancellable
+  window). When it runs, the `User` row is anonymised (name/email overwritten, `deletedAt` set) and the
+  projects the user solely owned are deleted (their R2 objects queued on `ObjectDeletion`). The row is
+  kept because `AuditLog` and other members' ledger rows reference it; shared projects are handed to
+  the longest-standing remaining member.
+- **Site location is optional and paired** — `Project.locationName` may stand alone; `latitude` and
+  `longitude` are either both set or both null (DB `project_coordinates_pair_check`).
 
 ## Constraints & Correctness
 - `amount > 0`; `0 <= gstAmount <= amount`; `occurredAt` not in the future (server-side).
@@ -282,13 +330,16 @@ model RateLimit {
 ## Implementation Status
 Implemented (migrations under `prisma/migrations`: `init`, `attachment_parent_check`,
 `idempotency_response`, `object_deletion_queue`, `attachment_original_name`, `invitations`,
-`invitation_expiry`, `rate_limit`, `enum_checks`): `User.id` = Neon Auth id with no `passwordHash`;
-`version` columns on Project/Transaction/DiaryEntry/Budget; `Attachment` with
+`invitation_expiry`, `rate_limit`, `enum_checks`, `invite_links`, `consent_and_deletion`,
+`project_location`): `User.id` = Neon Auth id with no `passwordHash` (and `deletedAt` for erased
+accounts); `version` columns on Project/Transaction/DiaryEntry/Budget; `Attachment` with
 `transactionId`/`diaryEntryId`/`status`/`size`/`originalName`; the `attachment_parent_check` and
 `attachment_status_check` CHECK constraints; `IdempotencyKey` with a stored `response`; `ObjectDeletion`
-retry queue; `Invitation` (pre-signup invites, expiring); `RateLimit` fixed-window counters. Enum-like
-columns (`Project.status`, `ProjectMember.role`, `Invitation.role`, `Transaction.paymentMode`,
-`Category.type`, `Budget.periodType`) also carry DB `CHECK` constraints. Prisma uses pooled
+retry queue; `Invitation` (pre-signup invites, expiring); `RateLimit` fixed-window counters;
+`ConsentRecord` and `DeletionRequest` (DPDP consent + erasure); optional `Project` location/geotag with
+the `project_coordinates_pair_check` constraint. Enum-like columns (`Project.status`,
+`ProjectMember.role`, `Invitation.role`, `Transaction.paymentMode`, `Category.type`,
+`Budget.periodType`, `DeletionRequest.status`) also carry DB `CHECK` constraints. Prisma uses pooled
 `DATABASE_URL` + direct `DIRECT_URL`.
 
 Pending: `checksum` column population.

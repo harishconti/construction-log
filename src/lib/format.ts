@@ -55,3 +55,13 @@ export function formatWeekRange(start: string | Date, endExclusive: string | Dat
   const eDay = part(e, { day: 'numeric' });
   return sMonth === eMonth ? `${sDay}–${eDay} ${eMonth}` : `${sDay} ${sMonth} – ${eDay} ${eMonth}`;
 }
+
+/** `12.971600, 77.594600` — six decimal places (≈10 cm). */
+export function formatCoords(latitude: number, longitude: number): string {
+  return `${latitude.toFixed(6)}, ${longitude.toFixed(6)}`;
+}
+
+/** OpenStreetMap link for a coordinate pair (no API key, usable from a CSP-restricted page). */
+export function mapUrl(latitude: number, longitude: number): string {
+  return `https://www.openstreetmap.org/?mlat=${latitude}&mlon=${longitude}#map=15/${latitude}/${longitude}`;
+}

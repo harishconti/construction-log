@@ -56,5 +56,29 @@ test('service worker never caches API responses', async ({ request }) => {
 });
 
 test('unknown routes return 404', async ({ request }) => {
-  expect((await request.get('/definitely-not-a-page')).status()).toBe(404);
+  for (const path of ['/definitely-not-a-page', '/blog/definitely-not-a-guide']) {
+    expect((await request.get(path)).status(), path).toBe(404);
+  }
+});
+
+test('blog index and a guide page are public', async ({ page }) => {
+  await page.goto('/blog');
+  await expect(page.getByRole('heading', { name: 'Guides & use cases', level: 1 })).toBeVisible();
+  await page.getByRole('link', { name: /Getting started with Construction Ledger/ }).click();
+  await expect(page).toHaveURL(/\/blog\/getting-started$/);
+  await expect(
+    page.getByRole('heading', { name: 'Getting started with Construction Ledger', level: 1 }),
+  ).toBeVisible();
+  await expect(page.getByRole('heading', { name: '1. Create your account' })).toBeVisible();
+});
+
+test('Terms and Privacy are public, dated pages', async ({ page }) => {
+  for (const [path, heading] of [
+    ['/terms', 'Terms of Service'],
+    ['/privacy', 'Privacy Policy'],
+  ] as const) {
+    await page.goto(path);
+    await expect(page.getByRole('heading', { name: heading, level: 1 })).toBeVisible();
+    await expect(page.getByText(/Last updated/)).toBeVisible();
+  }
 });

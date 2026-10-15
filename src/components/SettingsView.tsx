@@ -6,6 +6,7 @@ import { api } from '@/lib/api-client';
 import { Button } from '@/components/ui/Button';
 import { Alert } from '@/components/ui/Alert';
 import { Field, Select, TextInput, Textarea, DateInput } from '@/components/ui/inputs';
+import { LocationFields, type LocationValue } from '@/components/LocationFields';
 import { useToast } from '@/components/ui/Toast';
 import { todayIST } from '@/lib/period';
 
@@ -15,6 +16,9 @@ type Project = {
   description: string | null;
   startDate: string;
   status: string;
+  locationName: string | null;
+  latitude: number | null;
+  longitude: number | null;
   version: number;
 };
 type Category = { id: string; name: string; type: string; isActive: boolean };
@@ -35,6 +39,11 @@ export function SettingsView({ projectId, initialProject }: { projectId: string;
   const [description, setDescription] = useState(initialProject.description ?? '');
   const [startDate, setStartDate] = useState(todayIST(new Date(initialProject.startDate)));
   const [status, setStatus] = useState(initialProject.status);
+  const [location, setLocation] = useState<LocationValue>({
+    locationName: initialProject.locationName ?? '',
+    latitude: initialProject.latitude,
+    longitude: initialProject.longitude,
+  });
   const [savingProject, setSavingProject] = useState(false);
 
   const [categories, setCategories] = useState<Category[]>([]);
@@ -73,6 +82,9 @@ export function SettingsView({ projectId, initialProject }: { projectId: string;
         description: description || null,
         startDate, // bare YYYY-MM-DD: the server reads it as an IST calendar date
         status,
+        locationName: location.locationName.trim() || null,
+        latitude: location.latitude,
+        longitude: location.longitude,
         version: project.version,
       });
       setProject(res.project);
@@ -157,6 +169,7 @@ export function SettingsView({ projectId, initialProject }: { projectId: string;
             </Select>
           </Field>
         </div>
+        <LocationFields value={location} onChange={setLocation} />
         <Button type="submit" loading={savingProject}>
           {!savingProject && <Save size={16} aria-hidden />} Save project
         </Button>
