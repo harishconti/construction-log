@@ -3,6 +3,7 @@ import { requireUser } from '@/lib/auth';
 import { prisma } from '@/lib/prisma';
 import { requireRole } from '@/lib/requireRole';
 import { writeAudit } from '@/lib/audit';
+import { listCategories } from '@/lib/queries';
 import { createCategorySchema } from '@/lib/validation/schemas';
 
 type Ctx = { params: Promise<{ id: string }> };
@@ -13,11 +14,7 @@ export const GET = handle<Ctx>(async (req, { params: paramsPromise }) => {
   await requireRole(params.id, user.id, 'viewer');
 
   const includeInactive = new URL(req.url).searchParams.get('includeInactive') === 'true';
-  const categories = await prisma.category.findMany({
-    where: { projectId: params.id, ...(includeInactive ? {} : { isActive: true }) },
-    orderBy: { name: 'asc' },
-    select: { id: true, name: true, type: true, isActive: true },
-  });
+  const categories = await listCategories(params.id, includeInactive);
 
   return json({ categories });
 });
