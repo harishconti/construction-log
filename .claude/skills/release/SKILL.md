@@ -32,12 +32,14 @@ npm run prisma:deploy              # prisma migrate deploy against DIRECT_URL
 Forward-only. To undo a schema change, write a new migration; for data loss, restore (§6).
 
 ## 4. Deploy
-Vercel builds `prisma generate && next build` on Node 22. The repo only has `develop` (no `main`);
-check Vercel → Settings → Git for which branch is Production before assuming a merge deploys. Env vars are per-scope in Vercel — preview must
+Vercel builds `prisma generate && next build` on Node 22. **Merging to `develop` deploys production**
+(`https://www.harishspace.in`, live ~2 min after push; verified 15 Oct 2026). So apply migrations to
+production **before** merging code that needs them. Vercel does not run migrations. Env vars are per-scope in Vercel — preview must
 never get production credentials. The daily cron (`vercel.json`) calls `/api/maintenance/cleanup`
 with `CRON_SECRET`/`MAINTENANCE_SECRET`.
 
 ## 5. Verify
+- Read-only suite against prod: `E2E_BASE_URL=https://www.harishspace.in E2E_EXPECT_HSTS=1 npx playwright test --project=public-desktop --project=public-mobile`.
 - `curl -s https://www.harishspace.in/api/health` → 200 (503 means the DB is unreachable).
 - Sign in, open a project, add + edit + delete an expense with a photo (exercises R2 CORS + finalize).
 - Rollback code: promote the previous deployment in Vercel.
