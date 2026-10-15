@@ -84,7 +84,12 @@ test.describe('OAuth / magic-link landing', () => {
 
 test.describe('invite link page (signed out)', () => {
   for (const token of ['not-a-token', 'a'.repeat(43)]) {
-    test(`unknown link ${token.slice(0, 12)}… shows a clear error`, async ({ page }) => {
+    test(`unknown link ${token.slice(0, 12)}… shows a clear error`, async ({ page, request }) => {
+      // A well-formed token is looked up in the database; CI runs without one.
+      if (token.length === 43) {
+        const { db } = await (await request.get('/api/health')).json();
+        test.skip(!db, 'needs a database');
+      }
       await page.goto(`/invite/${token}`);
       await expect(page.getByRole('heading', { name: 'This invite link isn’t valid' })).toBeVisible();
       await expect(page.getByRole('link', { name: 'Sign in' })).toBeVisible();
