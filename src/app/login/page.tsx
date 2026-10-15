@@ -1,9 +1,10 @@
 'use client';
 
-import { useState } from 'react';
-import { useRouter } from 'next/navigation';
-import { Mail } from 'lucide-react';
+import { Suspense, useEffect, useState } from 'react';
+import { useRouter, useSearchParams } from 'next/navigation';
+import { Loader2, Mail } from 'lucide-react';
 import { GoogleIcon } from '@/components/icons/GoogleIcon';
+import { authCompletePath, safeNextPath } from '@/lib/safe-next';
 import { authClient } from '@/lib/auth/client';
 import { Button } from '@/components/ui/Button';
 import { Alert } from '@/components/ui/Alert';
@@ -11,17 +12,49 @@ import { Field, TextInput } from '@/components/ui/inputs';
 
 type Mode = 'sign-in' | 'sign-up';
 
+const VERIFIER_PARAM = 'neon_auth_session_verifier';
+const RETRY_PARAM = 'auth_retry';
+
 export default function LoginPage() {
+  // useSearchParams needs a Suspense boundary on a statically rendered page.
+  return (
+    <Suspense>
+      <LoginForm />
+    </Suspense>
+  );
+}
+
+function LoginForm() {
   const router = useRouter();
+  const params = useSearchParams();
+  const next = safeNextPath(params.get('next'));
+  // Arriving with a verifier means a Google / magic-link sign-in bounced before the session was
+  // set (see src/app/auth/complete). Retry the exchange once; a second bounce shows an error.
+  const finishing = params.has(VERIFIER_PARAM) && params.get(RETRY_PARAM) !== '1';
+  const signInFailed = (params.has(VERIFIER_PARAM) && !finishing) || params.has('oauth_error');
   const [mode, setMode] = useState<Mode>('sign-in');
   const [name, setName] = useState('');
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
-  const [error, setError] = useState<string | null>(null);
+  const [error, setError] = useState<string | null>(
+    signInFailed ? 'We couldn’t finish signing you in. Please try again.' : null,
+  );
   const [notice, setNotice] = useState<string | null>(null);
   const [pending, setPending] = useState(false);
   const [magicPending, setMagicPending] = useState(false);
   const [socialPending, setSocialPending] = useState(false);
+
+  useEffect(() => {
+    if (!finishing) return;
+    const qs = new URLSearchParams(params.toString());
+    qs.set(RETRY_PARAM, '1');
+    qs.set('next', next);
+    window.location.replace(`/auth/complete?${qs.toString()}`);
+  }, [finishing, params, next]);
+
+  // Absolute URLs for the auth server: where to land after OAuth / magic link, and on failure.
+  const completeUrl = () => `${window.location.origin}${authCompletePath(next)}`;
+  const errorUrl = () => `${window.location.origin}/login?oauth_error=1&next=${encodeURIComponent(next)}`;
 
   async function signInWithGoogle() {
     setError(null);
@@ -30,7 +63,9 @@ export default function LoginPage() {
     try {
       const result = await authClient.signIn.social({
         provider: 'google',
-        callbackURL: `${window.location.origin}/projects`,
+        callbackURL: completeUrl(),
+        newUserCallbackURL: completeUrl(),
+        errorCallbackURL: errorUrl(),
       });
       const url = (result as { data?: { url?: string } })?.data?.url;
       if (result?.error) setError(result.error.message ?? 'Google sign-in failed');
@@ -56,7 +91,7 @@ export default function LoginPage() {
         setError(result.error.message ?? 'Authentication failed');
         return;
       }
-      router.push('/projects');
+      router.push(next);
       router.refresh();
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Something went wrong');
@@ -76,7 +111,9 @@ export default function LoginPage() {
     try {
       const result = await authClient.signIn.magicLink({
         email,
-        callbackURL: `${window.location.origin}/projects`,
+        callbackURL: completeUrl(),
+        newUserCallbackURL: completeUrl(),
+        errorCallbackURL: errorUrl(),
       });
       if (result?.error) setError(result.error.message ?? 'Could not send sign-in link');
       else setNotice('Sign-in link sent — check your email.');
@@ -85,6 +122,16 @@ export default function LoginPage() {
     } finally {
       setMagicPending(false);
     }
+  }
+
+  if (finishing) {
+    return (
+      <main className="flex min-h-dvh items-center justify-center bg-bg p-4">
+        <p role="status" className="flex items-center gap-2 text-sm text-ink-2">
+          <Loader2 size={18} aria-hidden className="animate-spin" /> Finishing sign-in…
+        </p>
+      </main>
+    );
   }
 
   return (

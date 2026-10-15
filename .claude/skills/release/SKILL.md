@@ -38,7 +38,7 @@ never get production credentials. The daily cron (`vercel.json`) calls `/api/mai
 with `CRON_SECRET`/`MAINTENANCE_SECRET`.
 
 ## 5. Verify
-- `curl -s https://build.harishspace.in/api/health` → 200 (503 means the DB is unreachable).
+- `curl -s https://www.harishspace.in/api/health` → 200 (503 means the DB is unreachable).
 - Sign in, open a project, add + edit + delete an expense with a photo (exercises R2 CORS + finalize).
 - Rollback code: promote the previous deployment in Vercel.
 

@@ -4,7 +4,7 @@ A shared, mobile-first ledger for running a home-construction project: log expen
 keep a site diary, set weekly/monthly budgets per category and track actual vs planned. Each
 project has its own members with **admin / editor / viewer** roles.
 
-Live at `https://build.harishspace.in`.
+Live at `https://www.harishspace.in`.
 
 **Stack:** Next.js 16 (App Router) · React 19 · TypeScript · Tailwind · Prisma 5 · Neon Postgres ·
 Neon Auth · Cloudflare R2 (private, presigned uploads) · Vercel · Vitest.

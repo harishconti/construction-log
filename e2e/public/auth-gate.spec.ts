@@ -40,6 +40,10 @@ test.describe('API auth gate', () => {
     ['POST', '/api/uploads/a1/finalize'],
     ['GET', '/api/attachments/a1/download'],
     ['DELETE', '/api/attachments/a1'],
+    ['GET', `/api/projects/${pid}/invite-links`],
+    ['POST', `/api/projects/${pid}/invite-links`],
+    ['DELETE', `/api/projects/${pid}/invite-links/l1`],
+    ['POST', `/api/invite-links/${'a'.repeat(43)}/accept`],
   ];
 
   for (const [method, path] of endpoints) {
@@ -58,4 +62,32 @@ test.describe('API auth gate', () => {
       expect((await res.json()).code).toBe('UNAUTHORIZED');
     }
   });
+});
+
+test.describe('OAuth / magic-link landing', () => {
+  test('a verifier that cannot be exchanged retries once, then explains — never loops', async ({ page }) => {
+    // No session-challenge cookie, so the middleware can't exchange this verifier.
+    await page.goto('/projects?neon_auth_session_verifier=bogus');
+    // (Next's route announcer is also role=alert, so match the message itself.)
+    await expect(page.getByText('We couldn’t finish signing you in. Please try again.')).toBeVisible();
+    expect(new URL(page.url()).pathname).toBe('/login');
+    expect(new URL(page.url()).searchParams.get('auth_retry')).toBe('1');
+    await expect(page.getByRole('button', { name: 'Sign in with Google' })).toBeVisible();
+  });
+
+  test('/auth/complete without a session sends you to sign in and keeps `next`', async ({ page }) => {
+    await page.goto('/auth/complete?next=%2Finvite%2Fabc%3Fjoin%3D1');
+    await expect(page).toHaveURL(/\/login\?/);
+    expect(new URL(page.url()).searchParams.get('next')).toBe('/invite/abc?join=1');
+  });
+});
+
+test.describe('invite link page (signed out)', () => {
+  for (const token of ['not-a-token', 'a'.repeat(43)]) {
+    test(`unknown link ${token.slice(0, 12)}… shows a clear error`, async ({ page }) => {
+      await page.goto(`/invite/${token}`);
+      await expect(page.getByRole('heading', { name: 'This invite link isn’t valid' })).toBeVisible();
+      await expect(page.getByRole('link', { name: 'Sign in' })).toBeVisible();
+    });
+  }
 });

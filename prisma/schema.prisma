@@ -32,6 +32,8 @@ model User {
   uploads        Attachment[]
   projectsOwned  Project[]        @relation("ProjectCreator")
   invitationsSent Invitation[]    @relation("InvitationInviter")
+  inviteLinksCreated InviteLink[] @relation("InviteLinkCreator")
+  inviteLinksUsed    InviteLink[] @relation("InviteLinkUser")
 }
 
 model Project {
@@ -47,6 +49,7 @@ model Project {
   creator      User            @relation("ProjectCreator", fields: [createdBy], references: [id])
   members      ProjectMember[]
   invitations  Invitation[]
+  inviteLinks  InviteLink[]
   categories   Category[]
   transactions Transaction[]
   diaryEntries DiaryEntry[]
@@ -83,6 +86,27 @@ model Invitation {
 
   @@unique([projectId, email])
   @@index([email])
+}
+
+/// Shareable, single-use join link (no email needed). Only a SHA-256 hash of the token is stored;
+/// the raw token exists once, in the URL handed to the admin.
+model InviteLink {
+  id        String    @id @default(cuid())
+  projectId String
+  tokenHash String    @unique
+  role      String // 'admin' | 'editor' | 'viewer' (DB CHECK)
+  createdBy String
+  createdAt DateTime  @default(now())
+  expiresAt DateTime
+  usedAt    DateTime?
+  usedBy    String?
+  revokedAt DateTime?
+
+  project Project @relation(fields: [projectId], references: [id], onDelete: Cascade)
+  creator User    @relation("InviteLinkCreator", fields: [createdBy], references: [id])
+  user    User?   @relation("InviteLinkUser", fields: [usedBy], references: [id])
+
+  @@index([projectId, createdAt])
 }
 
 model Category {
