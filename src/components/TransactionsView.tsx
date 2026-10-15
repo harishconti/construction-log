@@ -65,12 +65,22 @@ function firstImage(t: Transaction): AttachmentItem | undefined {
   return t.attachments.find(isImage);
 }
 
-export function TransactionsView({ projectId, role }: { projectId: string; role: string }) {
+export function TransactionsView({
+  projectId,
+  role,
+  initial,
+}: {
+  projectId: string;
+  role: string;
+  /** First page (default filters) rendered with the page, so there is no fetch on arrival. */
+  initial?: { items: Transaction[]; pagination: Page; categories: Category[] };
+}) {
   const toast = useToast();
-  const [items, setItems] = useState<Transaction[]>([]);
-  const [categories, setCategories] = useState<Category[]>([]);
-  const [pagination, setPagination] = useState<Page | null>(null);
-  const [loading, setLoading] = useState(true);
+  const [items, setItems] = useState<Transaction[]>(initial?.items ?? []);
+  const [categories, setCategories] = useState<Category[]>(initial?.categories ?? []);
+  const [pagination, setPagination] = useState<Page | null>(initial?.pagination ?? null);
+  const [loading, setLoading] = useState(!initial);
+  const usedInitial = useRef(Boolean(initial));
   const [error, setError] = useState<string | null>(null);
   const [showDeleted, setShowDeleted] = useState(false);
 
@@ -135,7 +145,11 @@ export function TransactionsView({ projectId, role }: { projectId: string; role:
   }, [projectId, page, showDeleted, categoryId, paymentMode, vendor, from, to]);
 
   useEffect(() => {
-    // eslint-disable-next-line react-hooks/set-state-in-effect
+    // The server already rendered the default first page; fetch only when filters/paging change.
+    if (usedInitial.current) {
+      usedInitial.current = false;
+      return;
+    }
     void load();
   }, [load]);
 

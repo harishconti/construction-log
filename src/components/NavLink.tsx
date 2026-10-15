@@ -1,6 +1,6 @@
 'use client';
 
-import Link from 'next/link';
+import Link, { useLinkStatus } from 'next/link';
 import { usePathname } from 'next/navigation';
 import {
   BookOpen,
@@ -52,30 +52,48 @@ export function NavLink({
         aria-current={active ? 'page' : undefined}
         className={`flex flex-col items-center justify-center gap-1 text-xs ${
           variant === 'bottom' ? 'min-h-[56px] flex-1' : 'min-h-[60px] w-full rounded-md hover:bg-surface-2'
-        } ${active ? 'font-semibold text-primary' : 'text-ink-2'}`}
+        }`}
       >
-        <span
-          className={`flex h-8 w-14 items-center justify-center rounded-full transition-colors ${
-            active ? 'bg-primary-tint' : ''
-          }`}
-        >
-          <Icon size={22} strokeWidth={2} aria-hidden />
-        </span>
-        <span className="max-w-full truncate px-1">{label}</span>
+        <PillContent Icon={Icon} label={label} active={active} />
       </Link>
     );
   }
 
   return (
-    <Link
-      href={href}
-      aria-current={active ? 'page' : undefined}
+    <Link href={href} aria-current={active ? 'page' : undefined} className="block">
+      <RowContent Icon={Icon} label={label} active={active} />
+    </Link>
+  );
+}
+
+// Inside <Link> so useLinkStatus can show the tapped tab as selected while its navigation is
+// pending: the tap is acknowledged at once, even before the next screen arrives.
+function PillContent({ Icon, label, active }: { Icon: LucideIcon; label: string; active: boolean }) {
+  const { pending } = useLinkStatus();
+  const on = active || pending;
+  return (
+    <>
+      <span
+        className={`flex h-8 w-14 items-center justify-center rounded-full transition-colors ${on ? 'bg-primary-tint text-primary' : 'text-ink-2'}`}
+      >
+        <Icon size={22} strokeWidth={2} aria-hidden />
+      </span>
+      <span className={`max-w-full truncate px-1 ${on ? 'font-semibold text-primary' : 'text-ink-2'}`}>{label}</span>
+    </>
+  );
+}
+
+function RowContent({ Icon, label, active }: { Icon: LucideIcon; label: string; active: boolean }) {
+  const { pending } = useLinkStatus();
+  const on = active || pending;
+  return (
+    <span
       className={`flex min-h-11 items-center gap-3 rounded-md px-3 text-sm ${
-        active ? 'bg-primary-tint font-semibold text-primary' : 'text-ink-2 hover:bg-surface-2'
+        on ? 'bg-primary-tint font-semibold text-primary' : 'text-ink-2 hover:bg-surface-2'
       }`}
     >
       <Icon size={20} strokeWidth={2} aria-hidden />
       <span>{label}</span>
-    </Link>
+    </span>
   );
 }

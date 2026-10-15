@@ -30,14 +30,16 @@ function normalise(u: NeonUser): { id: string; email: string; name: string } {
 async function mirrorUser(u: NeonUser): Promise<AppUser> {
   const { id, email, name } = normalise(u);
 
-  const existing = await prisma.user.findUnique({
-    where: { id },
-    select: { id: true, name: true, email: true },
-  });
+  // Both lookups only need the session's (normalised) email, so run them together: this runs on
+  // every page and API request, and it saves a sequential database round trip each time.
+  const [existing, pending] = await Promise.all([
+    prisma.user.findUnique({ where: { id }, select: { id: true, name: true, email: true } }),
+    pendingInvitations(email),
+  ]);
   if (existing) {
     // Avoid a write on every request when nothing changed.
     if (existing.email === email && existing.name === name) {
-      await claimInvitations(existing);
+      await claimInvitations(existing, pending);
       return existing;
     }
     const updated = await prisma.user.update({
@@ -45,7 +47,7 @@ async function mirrorUser(u: NeonUser): Promise<AppUser> {
       data: { email, name },
       select: { id: true, name: true, email: true },
     });
-    await claimInvitations(updated);
+    await claimInvitations(updated, pending);
     return updated;
   }
 
@@ -62,7 +64,7 @@ async function mirrorUser(u: NeonUser): Promise<AppUser> {
     if (!row) throw err;
     created = row;
   }
-  await claimInvitations(created);
+  await claimInvitations(created, pending);
   return created;
 }
 
@@ -71,11 +73,17 @@ function isUniqueViolation(err: unknown): boolean {
 }
 
 /** Applies any non-expired pending email invitations once the account exists. Idempotent and cheap when empty. */
-async function claimInvitations(user: { id: string; email: string }): Promise<void> {
-  const invitations = await prisma.invitation.findMany({
-    where: { email: user.email, expiresAt: { gt: new Date() } },
+function pendingInvitations(email: string) {
+  return prisma.invitation.findMany({
+    where: { email, expiresAt: { gt: new Date() } },
     select: { projectId: true, role: true },
   });
+}
+
+async function claimInvitations(
+  user: { id: string; email: string },
+  invitations: Awaited<ReturnType<typeof pendingInvitations>>,
+): Promise<void> {
   if (invitations.length === 0) return;
 
   try {

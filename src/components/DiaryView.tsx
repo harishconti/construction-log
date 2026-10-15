@@ -31,14 +31,18 @@ export function DiaryView({
   projectId,
   currentUserId,
   role,
+  initial,
 }: {
   projectId: string;
   currentUserId: string;
   role: string;
+  /** First entries rendered with the page, so there is no fetch on arrival. */
+  initial?: { items: Entry[] };
 }) {
   const toast = useToast();
-  const [items, setItems] = useState<Entry[]>([]);
-  const [loading, setLoading] = useState(true);
+  const [items, setItems] = useState<Entry[]>(initial?.items ?? []);
+  const [loading, setLoading] = useState(!initial);
+  const usedInitial = useRef(Boolean(initial));
   const [error, setError] = useState<string | null>(null);
   const [sheet, setSheet] = useState<{ open: boolean; entry: Entry | null }>({ open: false, entry: null });
   const [confirm, setConfirm] = useState<{ open: boolean; message: string; run: () => void }>({
@@ -68,7 +72,11 @@ export function DiaryView({
   }, [projectId]);
 
   useEffect(() => {
-    // eslint-disable-next-line react-hooks/set-state-in-effect
+    // The server already rendered the first entries; later reloads (after edits) still fetch.
+    if (usedInitial.current) {
+      usedInitial.current = false;
+      return;
+    }
     void load();
   }, [load]);
 
