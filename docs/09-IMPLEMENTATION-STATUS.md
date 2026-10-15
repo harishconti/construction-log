@@ -23,14 +23,15 @@ Key properties in place:
 - `ObjectDeletion` retry queue for deferred R2 deletions.
 
 Migrations: `init`, `attachment_parent_check`, `idempotency_response`, `object_deletion_queue`,
-`attachment_original_name`, `invitations`, `invitation_expiry`, `rate_limit`, `enum_checks`.
+`attachment_original_name`, `invitations`, `invitation_expiry`, `rate_limit`, `enum_checks`, `invite_links`
+(applied to the Neon `dev` branch; **apply to production before deploying** the invite-link code).
 
 ## API endpoints (implemented)
 | Area | Endpoints |
 |---|---|
 | Auth | `ALL /api/auth/[...path]` (Neon Auth proxy) |
 | Projects | `GET/POST /api/projects`; `GET/PATCH /api/projects/:id` |
-| Members | `GET/POST /api/projects/:id/members`; `PATCH/DELETE /api/projects/:id/members/:userId`; `DELETE /api/projects/:id/invitations/:invitationId` |
+| Members | `GET/POST /api/projects/:id/members`; `PATCH/DELETE /api/projects/:id/members/:userId`; `DELETE /api/projects/:id/invitations/:invitationId`; `GET/POST /api/projects/:id/invite-links`; `DELETE /api/projects/:id/invite-links/:linkId`; `POST /api/invite-links/:token/accept` |
 | Categories | `GET/POST /api/projects/:id/categories`; `PATCH /api/projects/:id/categories/:catId` |
 | Transactions | `GET/POST /api/projects/:id/transactions`; `PATCH/DELETE /api/projects/:id/transactions/:txId`; `POST …/restore` |
 | Diary | `GET/POST /api/projects/:id/diary`; `PATCH/DELETE /api/projects/:id/diary/:entryId` |
@@ -50,7 +51,14 @@ Nav: desktop sidebar; mobile bottom tabs (Dashboard/Transactions/Diary) + **More
 PWA: `manifest.json` + service worker (`public/sw.js`, registered in production).
 
 ## Behaviour implemented
-- **Auth**: Neon Auth sign-up/in via same-origin proxy; server `getSession`; user mirror upsert.
+- **Auth**: Neon Auth sign-up/in via same-origin proxy; server `getSession`; user mirror upsert. Google and
+  magic-link sign-ins return to `/auth/complete?next=…`, where the proxy exchanges the
+  `neon_auth_session_verifier` for a session cookie; `next` is sanitised (`safeNextPath`, no open
+  redirects). If a verifier reaches `/login` (exchange bounced) it retries once, then shows an error.
+- **Invite links**: admins create single-use, 7-day join links per role (Members page: Copy / native
+  Share / Revoke). Only a SHA-256 of the token is stored. `/invite/:token` is public and never consumes
+  the link; joining is a POST after sign-in (Google, email/password, or magic link), and a signed-up
+  user returning via `?join=1` is joined automatically. Used / revoked / expired links show a clear message.
 - **Authorization**: `requireRole(projectId, userId, minRole)` on every route; project isolation via `projectId` scoping; last-admin safeguard; editor-any transaction edits (admin-only delete/restore); diary author/admin edits, admin delete. The project creator is its first admin. Admins can invite by email before the invitee has an account (pending `Invitation` claimed automatically on first sign-in).
 - **Uploads**: presign → browser PUT direct to R2 → finalize (HeadObject verifies existence/size, magic bytes must match the declared type,
   re-checks the size cap) → link on create. Images render inline via signed GET; **all other types are
@@ -63,7 +71,7 @@ PWA: `manifest.json` + service worker (`public/sw.js`, registered in production)
 - **Maintenance**: reaps `pending` uploads older than 24h and retries deferred R2 deletions (attempt cap + TTL).
 
 ## Verification
-- `npm run typecheck`, `npm run lint`, `npm test` (**113 unit tests**: roles, validation, period/budget
+- `npm run typecheck`, `npm run lint`, `npm test` (**129 unit tests**: roles, validation, period/budget
   math, maintenance auth, file policy, audit regressions, API error mapping/pagination, API client,
   INR/IST formatting, and server guards — `requireRole`, rate limit, audit write, idempotency,
   attachment linking, user-mirror first-sign-in race — with Prisma mocked), `npm run build` — all green.
@@ -165,9 +173,11 @@ colour); budget Revise/Set targets under 44px; long names/URLs causing sideways 
 `gstAmount:` validation string. Not covered locally: R2 uploads, Google sign-in, magic link.
 
 ## Not yet implemented (backlog)
-1. **Magic link**: UI is wired (`signIn.magicLink`), but the branch reports `magicLink.enabled: false`
-   (`POST /api/auth/sign-in/magic-link` → 404). Enable it on the Neon Auth branch to activate.
-2. **Neon Auth config**: add trusted origins (`https://build.harishspace.in`, preview), review sign-up controls.
+1. **Magic link**: enabled on production and `dev` (15 Oct 2026), verified by email on `dev`. Links expire
+   after 5 minutes (Neon default). Still on Neon's shared SMTP — configure custom SMTP before wider use.
+2. **Neon Auth config**: production is served at `https://www.harishspace.in` (trusted; the planned
+   `build.harishspace.in` has no DNS record). Review sign-up controls (sign-up is open). Phone/SMS auth
+   would need an app `send.otp` webhook + SMS provider (not planned).
 3. **R2 CORS**: allow `localhost:3000` (+ production origin) for PUT/GET/HEAD.
 4. **Release/backup tooling**: `npm run db:backup` / `db:restore` + `prisma:deploy` implemented (see
    `10-OPERATIONS.md`); still to do: schedule backups outside Vercel, provision a separate prod backup

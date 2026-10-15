@@ -8,7 +8,7 @@ this file covers day‑to‑day operations.
 |---|---|---|---|---|
 | Local dev | `next dev` | **dev branch** (recommended) | `construction-ledger-dev` | `http://localhost:3000` |
 | Preview | Vercel preview | preview/test branch | preview bucket | preview URL |
-| Production | Vercel prod | production branch | `construction-ledger-prod` | `https://build.harishspace.in` |
+| Production | Vercel prod | production branch | `construction-ledger-prod` | `https://www.harishspace.in` (planned `build.` subdomain has no DNS) |
 
 Per-environment variables (set in Vercel scopes — see `06-DEPLOYMENT.md`): `DATABASE_URL`,
 `DIRECT_URL`, `NEON_AUTH_BASE_URL`, `NEON_AUTH_COOKIE_SECRET`, `R2_*`, `NEXT_PUBLIC_APP_URL`.
@@ -70,11 +70,15 @@ Use this if the ledger grows beyond the initial admin:
 2. **Add to a project**: the project creator is the first **admin**. Members screen → add by email + role.
    If the person already has an account they're added immediately; otherwise a **pending invitation** is
    stored and applied automatically on their first sign-in. Pending invitations can be cancelled.
+   **Or invite with a link** (no email needed): Members → *Invite with a link* → pick a role → Copy/Share.
+   The link is single-use and lasts 7 days; the person signs in with Google or email (new accounts are
+   created on the way) and is joined automatically. Unused links can be revoked; the token is shown once.
 3. **Roles are per project** (admin/editor/viewer). New sign-ups get **no membership** automatically.
 4. **Origins**: add any new app origin to Neon Auth trusted origins **and** to the R2 bucket CORS
    (`PUT, GET, HEAD`, `Content-Type`).
-5. **Future self-serve onboarding** would need an invite-by-email flow (mailer + accept-invitation route)
-   and possibly an organization model — not built.
+5. **Magic link** is enabled on the production auth branch (Neon shared SMTP; links expire in 5 min).
+   Phone/SMS sign-in is **not** enabled: it would need an app `send.otp` webhook, an SMS provider (plus
+   India DLT registration) and custom UI, and only works for accounts that already exist.
 
 ## 5. Identity for production
 - **Google**: the branch uses **shared Google keys** (dev only). For production, create your own Google

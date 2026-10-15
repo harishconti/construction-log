@@ -29,7 +29,7 @@ npm run build && npm run test:e2e            # public tier, boots next start on 
 npx playwright test e2e/public/login.spec.ts --project=public-mobile
 npm run test:e2e:ui                          # interactive runner
 npm run test:e2e:report                      # open last HTML report (traces on failure)
-E2E_BASE_URL=https://build.harishspace.in E2E_EXPECT_HSTS=1 npx playwright test   # public tier vs a deploy
+E2E_BASE_URL=https://www.harishspace.in E2E_EXPECT_HSTS=1 npx playwright test   # public tier vs a deploy
 ```
 `reuseExistingServer` is on locally — if a stale `next start`/`next dev` is on :3100 it will be used.
 

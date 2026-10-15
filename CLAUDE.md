@@ -1,7 +1,7 @@
 # Construction Ledger — agent guide
 
 Shared multi-user ledger for a home-construction project: expenses (with bills/photos), a site diary,
-budgets vs actuals, per-project roles. Production: `https://build.harishspace.in`.
+budgets vs actuals, per-project roles. Production: `https://www.harishspace.in` (the planned `build.harishspace.in` has no DNS record).
 Stack: Next.js 16 (App Router, Turbopack) · React 19 · TypeScript strict · Prisma 5 · Neon Postgres ·
 Neon Auth (`@neondatabase/auth`) · Cloudflare R2 (private) · Tailwind 3 · Vitest 5 · Vercel. Node 22.
 

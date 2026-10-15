@@ -60,6 +60,10 @@ export const updateMemberRoleSchema = z.object({
   role: roleSchema,
 });
 
+export const createInviteLinkSchema = z.object({
+  role: roleSchema,
+});
+
 // ---------------------------------------------------------------------------
 // Categories
 // ---------------------------------------------------------------------------

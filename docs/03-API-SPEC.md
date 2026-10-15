@@ -30,6 +30,10 @@ member of project A cannot read or write project B.
 | PATCH | /api/projects/:id/members/:userId | Change member role | admin |
 | DELETE | /api/projects/:id/members/:userId | Remove member | admin |
 | DELETE | /api/projects/:id/invitations/:invitationId | Cancel a pending invitation | admin |
+| GET | /api/projects/:id/invite-links | Active (unused, unrevoked, unexpired) join links; tokens never returned | admin |
+| POST | /api/projects/:id/invite-links | Create a single-use 7-day link `{ role }` → `{ link, path }` (token shown once) | admin |
+| DELETE | /api/projects/:id/invite-links/:linkId | Revoke an unused link (idempotent) | admin |
+| POST | /api/invite-links/:token/accept | Join with the link's role → `{ projectId, role, joined }`; already a member → no-op; `404` unknown, `410 INVITE_LINK_USED/REVOKED/EXPIRED` | any signed-in user |
 
 - The project creator becomes its **admin**. New sign-ups receive **no automatic membership**; an admin
   adds them by email (existing account → membership now; new email → pending invitation that applies on

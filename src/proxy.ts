@@ -10,6 +10,9 @@ export default function proxy(req: NextRequest) {
   return middleware(req);
 }
 
+// `/auth/complete` is where every OAuth / magic-link sign-in lands: the middleware must run there
+// to exchange the `neon_auth_session_verifier` for a session cookie. `/` is covered in case the
+// provider returns a first-time user to the site root. (The middleware skips /login itself.)
 export const config = {
-  matcher: ['/projects/:path*'],
+  matcher: ['/', '/auth/complete', '/projects/:path*'],
 };

@@ -11,6 +11,7 @@ import { EmptyState } from '@/components/ui/EmptyState';
 import { ConfirmDialog } from '@/components/ui/ConfirmDialog';
 import { SkeletonRows } from '@/components/ui/Skeleton';
 import { useToast } from '@/components/ui/Toast';
+import { InviteLinksPanel } from '@/components/InviteLinksPanel';
 
 type Role = 'admin' | 'editor' | 'viewer';
 type Member = { role: Role; createdAt: string; user: { id: string; name: string; email: string } };
@@ -19,7 +20,15 @@ type Invitation = { id: string; email: string; role: Role; expiresAt: string };
 const ROLES: Role[] = ['admin', 'editor', 'viewer'];
 const ROLE_LABEL: Record<Role, string> = { admin: 'Admin', editor: 'Editor', viewer: 'Viewer' };
 
-export function MembersView({ projectId, currentUserId }: { projectId: string; currentUserId: string }) {
+export function MembersView({
+  projectId,
+  projectName,
+  currentUserId,
+}: {
+  projectId: string;
+  projectName: string;
+  currentUserId: string;
+}) {
   const toast = useToast();
   const [members, setMembers] = useState<Member[]>([]);
   const [invitations, setInvitations] = useState<Invitation[]>([]);
@@ -150,6 +159,8 @@ export function MembersView({ projectId, currentUserId }: { projectId: string; c
           If they already have an account they are added now; otherwise the invitation applies when they sign up with that email.
         </p>
       </form>
+
+      <InviteLinksPanel projectId={projectId} projectName={projectName} />
 
       {error && <Alert message={error} onRetry={load} />}
 
