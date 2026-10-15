@@ -1,13 +1,25 @@
 import type { Metadata, Viewport } from 'next';
-import { Archivo, IBM_Plex_Sans } from 'next/font/google';
+import localFont from 'next/font/local';
 import { ServiceWorkerRegister } from '@/components/ServiceWorkerRegister';
 import { ToastProvider } from '@/components/ui/Toast';
 import './globals.css';
 
-const display = Archivo({ subsets: ['latin'], weight: ['600', '700'], variable: '--font-display', display: 'swap' });
-const body = IBM_Plex_Sans({
-  subsets: ['latin'],
-  weight: ['400', '500', '600'],
+// Self-hosted (Fontsource 5.3.0 latin subsets, SIL OFL — see src/app/fonts/LICENSE-*). next/font/google
+// downloads from Google during `next build`, which made CI/Vercel builds fail intermittently.
+const display = localFont({
+  src: [
+    { path: './fonts/archivo-latin-600-normal.woff2', weight: '600', style: 'normal' },
+    { path: './fonts/archivo-latin-700-normal.woff2', weight: '700', style: 'normal' },
+  ],
+  variable: '--font-display',
+  display: 'swap',
+});
+const body = localFont({
+  src: [
+    { path: './fonts/ibm-plex-sans-latin-400-normal.woff2', weight: '400', style: 'normal' },
+    { path: './fonts/ibm-plex-sans-latin-500-normal.woff2', weight: '500', style: 'normal' },
+    { path: './fonts/ibm-plex-sans-latin-600-normal.woff2', weight: '600', style: 'normal' },
+  ],
   variable: '--font-body',
   display: 'swap',
 });
