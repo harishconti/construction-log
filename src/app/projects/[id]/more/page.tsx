@@ -8,6 +8,7 @@ export const dynamic = 'force-dynamic';
 const ITEMS: MoreItem[] = [
   { href: '', label: 'Dashboard', desc: 'Spend, budgets and recent activity', icon: 'dashboard' },
   { href: '/transactions', label: 'Expenses', desc: 'All expenses and payments', icon: 'transactions' },
+  { href: '/funding', label: 'Funding', desc: 'Money in: loans, clients, grants', icon: 'funding' },
   { href: '/timeline', label: 'Timeline', desc: 'Expenses and diary together', icon: 'timeline' },
   { href: '/diary', label: 'Diary', desc: 'Site observations and photos', icon: 'diary' },
   { href: '/budgets', label: 'Budgets', desc: 'Planned vs actual by week/month', icon: 'budgets' },

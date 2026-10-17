@@ -5,7 +5,7 @@
 //  - Auth identity is Neon Auth; User.id mirrors the Neon Auth user id. No passwords stored.
 //  - Actual budget spend is NEVER stored; it is derived from Transaction rows.
 //  - Attachments are private and server-keyed; attached rows reference exactly one parent
-//    (transaction XOR diary_entry), enforced by a CHECK constraint in a migration.
+//    (transaction XOR diary_entry XOR funding), enforced by a CHECK constraint in a migration.
 //  - `version` columns provide optimistic locking. `IdempotencyKey` makes create/finalize retry-safe.
 
 generator client {
@@ -27,6 +27,7 @@ model User {
 
   memberships    ProjectMember[]
   transactions   Transaction[]
+  fundings       Funding[]
   diaryEntries   DiaryEntry[]
   auditLogs      AuditLog[]
   budgetsCreated Budget[]
@@ -58,6 +59,7 @@ model Project {
   inviteLinks  InviteLink[]
   categories   Category[]
   transactions Transaction[]
+  fundings     Funding[]
   diaryEntries DiaryEntry[]
   budgets      Budget[]
   attachments  Attachment[]
@@ -119,7 +121,7 @@ model Category {
   id        String  @id @default(cuid())
   projectId String
   name      String // e.g. "Cement", "Labour", "GST", "Electricity"
-  type      String // 'material' | 'labour' | 'tax' | 'utility' | 'misc'
+  type      String // 'material' | 'labour' | 'tax' | 'utility' | 'equipment' | 'transport' | 'professional' | 'subcontract' | 'overhead' | 'finance' | 'misc'
   isActive  Boolean @default(true)
 
   project      Project       @relation(fields: [projectId], references: [id], onDelete: Cascade)
@@ -155,6 +157,33 @@ model Transaction {
   @@index([createdBy])
 }
 
+/// Money coming IN to a project: bank loans, client/customer payments, peer lending, self funding,
+/// grants and investor money. The funding side of the ledger (Transaction is the expenditure side).
+model Funding {
+  id          String    @id @default(cuid())
+  projectId   String
+  source      String // 'bank' | 'client' | 'customer' | 'peer_lending' | 'self' | 'grant' | 'investor' | 'other'
+  sourceName  String? // free-text party: bank, client, customer or lender name
+  amount      Decimal   @db.Decimal(12, 2)
+  receivedAt  DateTime
+  mode        String // 'cash' | 'upi' | 'bank' | 'card' | 'credit'
+  reference   String? // cheque no / UTR / loan account no
+  description String?
+  version     Int       @default(0)
+  createdBy   String
+  createdAt   DateTime  @default(now())
+  updatedAt   DateTime  @updatedAt
+  deletedAt   DateTime? // soft delete
+
+  project       Project      @relation(fields: [projectId], references: [id], onDelete: Cascade)
+  createdByUser User         @relation(fields: [createdBy], references: [id])
+  attachments   Attachment[]
+
+  @@index([projectId, receivedAt])
+  @@index([projectId, source])
+  @@index([createdBy])
+}
+
 model DiaryEntry {
   id        String   @id @default(cuid())
   projectId String
@@ -179,6 +208,7 @@ model Attachment {
   projectId     String
   transactionId String?
   diaryEntryId  String?
+  fundingId     String?
   status        String   @default("pending") // 'pending' | 'ready'
   fileKey       String // server-generated R2 object key; clients never supply this
   originalName  String? // client filename, sanitized, used only for the download header
@@ -191,11 +221,13 @@ model Attachment {
   project     Project      @relation(fields: [projectId], references: [id], onDelete: Cascade)
   transaction Transaction? @relation(fields: [transactionId], references: [id], onDelete: Cascade)
   diaryEntry  DiaryEntry?  @relation(fields: [diaryEntryId], references: [id], onDelete: Cascade)
+  funding     Funding?     @relation(fields: [fundingId], references: [id], onDelete: Cascade)
   uploader    User         @relation(fields: [uploadedBy], references: [id])
 
   @@index([projectId])
   @@index([transactionId])
   @@index([diaryEntryId])
+  @@index([fundingId])
   @@index([status])
 }
 
@@ -237,7 +269,7 @@ model BudgetRevision {
 
 model AuditLog {
   id        String   @id @default(cuid())
-  entity    String // 'transaction' | 'diary_entry' | 'budget' | 'project' | 'member' | 'category' | 'attachment'
+  entity    String // 'transaction' | 'funding' | 'diary_entry' | 'budget' | 'project' | 'member' | 'category' | 'attachment'
   entityId  String
   action    String // 'create' | 'update' | 'delete' | 'restore' | 'role_change' | 'finalize'
   actorId   String

@@ -145,7 +145,7 @@ test('add a diary entry', async ({ page }) => {
 
 test('no page scrolls sideways on mobile (long project/vendor names)', async ({ page }) => {
   await page.setViewportSize({ width: 360, height: 740 }); // narrowest common Android width
-  for (const path of ['/projects', '', '/transactions', '/timeline', '/diary', '/budgets', '/more', '/members', '/settings']) {
+  for (const path of ['/projects', '', '/transactions', '/funding', '/timeline', '/diary', '/budgets', '/more', '/members', '/settings']) {
     await page.goto(path === '/projects' ? path : `/projects/${projectId}${path}`);
     await page.waitForLoadState('networkidle');
     const overflow = await page.evaluate(() => document.documentElement.scrollWidth - document.documentElement.clientWidth);
@@ -161,7 +161,11 @@ test('no page scrolls sideways on mobile (long project/vendor names)', async ({ 
 });
 
 test('the floating Add button never covers the last row', async ({ page }) => {
-  for (const [path, row] of [['/transactions', 'li[data-tx]'], ['/diary', 'main li']] as const) {
+  for (const [path, row] of [
+    ['/transactions', 'li[data-tx]'],
+    ['/funding', 'li[data-funding]'],
+    ['/diary', 'main li'],
+  ] as const) {
     await page.goto(`/projects/${projectId}${path}`);
     await page.waitForLoadState('networkidle');
     const { last, fab } = await page.evaluate((sel) => {

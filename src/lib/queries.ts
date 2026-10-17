@@ -10,10 +10,14 @@ export type PageInfo = { page: number; limit: number; total: number; pages: numb
 type Paging = { page: number; limit: number; skip: number; take: number };
 
 export const DEFAULT_TX_PAGING: Paging = { page: 1, limit: 25, skip: 0, take: 25 };
+export const DEFAULT_FUNDING_PAGING: Paging = { page: 1, limit: 25, skip: 0, take: 25 };
 export const DEFAULT_DIARY_PAGING: Paging = { page: 1, limit: 20, skip: 0, take: 20 };
 
 /** Attachments for a set of parent rows, grouped by parent id. */
-async function attachmentsBy(field: 'transactionId' | 'diaryEntryId', ids: string[]) {
+async function attachmentsBy(
+  field: 'transactionId' | 'diaryEntryId' | 'fundingId',
+  ids: string[],
+) {
   const rows = ids.length
     ? await prisma.attachment.findMany({ where: { [field]: { in: ids } }, orderBy: { uploadedAt: 'asc' } })
     : [];
@@ -73,6 +77,57 @@ export async function listTransactions(projectId: string, f: TransactionFilters 
     rows.map(async (t) => ({
       ...serializeTransaction(t),
       attachments: await serializeAttachments(byParent.get(t.id) ?? []),
+    })),
+  );
+  const pagination: PageInfo = {
+    page: paging.page,
+    limit: paging.limit,
+    total,
+    pages: Math.ceil(total / paging.limit),
+  };
+  return { items, pagination };
+}
+
+type FundingRow = Prisma.FundingGetPayload<Record<string, never>>;
+
+export function serializeFunding(f: FundingRow) {
+  return { ...f, amount: f.amount.toString() };
+}
+
+export type FundingFilters = {
+  source?: string;
+  sourceName?: string;
+  from?: Date;
+  to?: Date;
+  includeDeleted?: boolean;
+};
+
+export async function listFundings(projectId: string, f: FundingFilters = {}, paging = DEFAULT_FUNDING_PAGING) {
+  const where: Prisma.FundingWhereInput = {
+    projectId,
+    ...(f.includeDeleted ? {} : { deletedAt: null }),
+    ...(f.source ? { source: f.source } : {}),
+    ...(f.sourceName ? { sourceName: { contains: f.sourceName, mode: 'insensitive' } } : {}),
+    ...(f.from || f.to
+      ? { receivedAt: { ...(f.from ? { gte: f.from } : {}), ...(f.to ? { lte: f.to } : {}) } }
+      : {}),
+  };
+
+  const [total, rows] = await Promise.all([
+    prisma.funding.count({ where }),
+    prisma.funding.findMany({
+      where,
+      orderBy: [{ receivedAt: 'desc' }, { createdAt: 'desc' }],
+      skip: paging.skip,
+      take: paging.take,
+    }),
+  ]);
+
+  const byParent = await attachmentsBy('fundingId', rows.map((x) => x.id));
+  const items = await Promise.all(
+    rows.map(async (x) => ({
+      ...serializeFunding(x),
+      attachments: await serializeAttachments(byParent.get(x.id) ?? []),
     })),
   );
   const pagination: PageInfo = {

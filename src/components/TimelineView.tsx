@@ -4,12 +4,14 @@ import { useCallback, useEffect, useMemo, useState } from 'react';
 import Link from 'next/link';
 import { BookOpen, ChevronDown, Receipt, X } from 'lucide-react';
 import { api } from '@/lib/api-client';
+import { FUNDING_SOURCE_LABEL } from '@/lib/funding';
 import { formatDayLabel, formatINR } from '@/lib/format';
 import { Alert } from '@/components/ui/Alert';
 import { Button } from '@/components/ui/Button';
 import { EmptyState } from '@/components/ui/EmptyState';
 import { SkeletonRows } from '@/components/ui/Skeleton';
 import { DateInput, Field } from '@/components/ui/inputs';
+import { FundingIcon } from '@/components/FundingIcon';
 import { istDateToInstant, istDayEnd } from '@/lib/period';
 
 type Item =
@@ -23,6 +25,17 @@ type Item =
       description: string | null;
       category: { id: string; name: string };
     }
+  | {
+      type: 'funding';
+      id: string;
+      date: string;
+      amount: string;
+      source: string;
+      sourceName: string | null;
+      mode: string;
+      reference: string | null;
+      description: string | null;
+    }
   | { type: 'diary'; id: string; date: string; title: string; body: string };
 
 type TimelineResponse = { items: Item[]; nextCursor: string | null; hasMore: boolean };
@@ -34,6 +47,10 @@ const PAYMENT_LABEL: Record<string, string> = {
   card: 'Card',
   credit: 'Credit',
 };
+
+function fundingLabel(source: string): string {
+  return (FUNDING_SOURCE_LABEL as Record<string, string>)[source] ?? source;
+}
 
 /** IST calendar day, used to group items. */
 function dayKey(iso: string): string {
@@ -81,16 +98,17 @@ export function TimelineView({ projectId }: { projectId: string }) {
   }, [loadFirst]);
 
   const groups = useMemo(() => {
-    const out: { key: string; label: string; spend: number; items: Item[] }[] = [];
+    const out: { key: string; label: string; spend: number; received: number; items: Item[] }[] = [];
     for (const it of items) {
       const key = dayKey(it.date);
       let g = out.find((x) => x.key === key);
       if (!g) {
-        g = { key, label: formatDayLabel(it.date), spend: 0, items: [] };
+        g = { key, label: formatDayLabel(it.date), spend: 0, received: 0, items: [] };
         out.push(g);
       }
       g.items.push(it);
       if (it.type === 'transaction') g.spend += Number(it.amount);
+      if (it.type === 'funding') g.received += Number(it.amount);
     }
     return out;
   }, [items]);
@@ -146,7 +164,7 @@ export function TimelineView({ projectId }: { projectId: string }) {
       {loading && items.length === 0 ? (
         <SkeletonRows leading trailing label="Loading timeline" />
       ) : items.length === 0 ? (
-        <EmptyState title={from || to ? 'Nothing in this date range.' : 'Nothing here yet — expenses and diary entries will show up here.'} />
+        <EmptyState title={from || to ? 'Nothing in this date range.' : 'Nothing here yet — funding, expenses and diary entries will show up here.'} />
       ) : (
         <div className="space-y-4">
           {groups.map((g) => (
@@ -155,7 +173,10 @@ export function TimelineView({ projectId }: { projectId: string }) {
                 <h2 id={`tl-${g.key}`} className="font-semibold">
                   {g.label}
                 </h2>
-                {g.spend > 0 && <span className="num">{formatINR(g.spend)}</span>}
+                <span className="flex items-center gap-3">
+                  {g.spend > 0 && <span className="num">{formatINR(g.spend)}</span>}
+                  {g.received > 0 && <span className="num text-ok">+{formatINR(g.received)}</span>}
+                </span>
               </header>
               <ol className="divide-y divide-border overflow-hidden rounded-lg border border-border bg-surface">
                 {g.items.map((it) => (
@@ -175,6 +196,22 @@ export function TimelineView({ projectId }: { projectId: string }) {
                           </span>
                         </span>
                         <span className="num shrink-0 text-right font-semibold">{formatINR(it.amount)}</span>
+                      </Link>
+                    ) : it.type === 'funding' ? (
+                      <Link href={`${base}/funding#funding-${it.id}`} className="flex items-center gap-3 p-3 text-sm hover:bg-surface-2">
+                        <span className="flex h-11 w-11 shrink-0 items-center justify-center rounded-sm bg-ok-tint text-ok">
+                          <FundingIcon source={it.source} size={20} />
+                          <span className="sr-only">Funding</span>
+                        </span>
+                        <span className="min-w-0 flex-1">
+                          <span className="block truncate font-medium">{it.sourceName || fundingLabel(it.source)}</span>
+                          <span className="block truncate text-ink-2">
+                            {[fundingLabel(it.source), PAYMENT_LABEL[it.mode] ?? it.mode, it.description]
+                              .filter(Boolean)
+                              .join(' · ')}
+                          </span>
+                        </span>
+                        <span className="num shrink-0 text-right font-semibold text-ok">+{formatINR(it.amount)}</span>
                       </Link>
                     ) : (
                       <Link href={`${base}/diary#entry-${it.id}`} className="flex items-start gap-3 p-3 text-sm hover:bg-surface-2">

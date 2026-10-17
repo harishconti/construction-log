@@ -3,7 +3,9 @@ import { MapPin } from 'lucide-react';
 import { DashboardChart, type ChartDatum } from '@/components/DashboardChart';
 import { StatusBadge, ProgressBar, type BudgetStatus } from '@/components/ui/StatusBadge';
 import { EmptyState } from '@/components/ui/EmptyState';
+import { FundingIcon } from '@/components/FundingIcon';
 import { computeVariance } from '@/lib/budget';
+import { FUNDING_SOURCE_LABEL } from '@/lib/funding';
 import { formatCoords, formatDate, formatDayLabel, formatINR, mapUrl } from '@/lib/format';
 import { periodRange, startOfMonthIST } from '@/lib/period';
 import { prisma } from '@/lib/prisma';
@@ -16,7 +18,7 @@ export default async function ProjectDashboard({ params }: { params: Promise<{ i
   const periodStart = startOfMonthIST(new Date());
   const { start, end } = periodRange('month', periodStart);
 
-  const [project, totalAgg, periodAgg, grouped, budgets, categories, recent, recentDiary] = await Promise.all([
+  const [project, totalAgg, periodAgg, grouped, budgets, categories, recent, recentDiary, fundingAgg, periodFundingAgg, fundingGrouped] = await Promise.all([
     prisma.project.findUnique({
       where: { id },
       select: { name: true, startDate: true, locationName: true, latitude: true, longitude: true },
@@ -45,12 +47,30 @@ export default async function ProjectDashboard({ params }: { params: Promise<{ i
       take: 3,
       select: { id: true, entryDate: true, title: true },
     }),
+    prisma.funding.aggregate({ where: { projectId: id, deletedAt: null }, _sum: { amount: true } }),
+    prisma.funding.aggregate({
+      where: { projectId: id, deletedAt: null, receivedAt: { gte: start, lt: end } },
+      _sum: { amount: true },
+    }),
+    prisma.funding.groupBy({
+      by: ['source'],
+      where: { projectId: id, deletedAt: null },
+      _sum: { amount: true },
+    }),
   ]);
 
   const total = Number(totalAgg._sum.amount ?? 0);
   const periodSpend = Number(periodAgg._sum.amount ?? 0);
   const totalPlanned = budgets.reduce((s, b) => s + Number(b.plannedAmount), 0);
   const variance = computeVariance(totalPlanned, periodSpend);
+
+  const totalFunding = Number(fundingAgg._sum.amount ?? 0);
+  const periodFunding = Number(periodFundingAgg._sum.amount ?? 0);
+  // Treat funding as the available "plan" and spend as "actual": balance = funding − spend.
+  const fundingVariance = computeVariance(totalFunding, total);
+  const fundingRows = fundingGrouped
+    .map((g) => ({ source: g.source, amount: Number(g._sum.amount ?? 0) }))
+    .sort((a, b) => b.amount - a.amount);
 
   const nameById = new Map(categories.map((c) => [c.id, c.name]));
   const rows = [...new Set([...budgets.map((b) => b.categoryId), ...grouped.map((g) => g.categoryId)])]
@@ -109,16 +129,72 @@ export default async function ProjectDashboard({ params }: { params: Promise<{ i
       </section>
 
       {/* Stat cards */}
-      <div className="grid grid-cols-2 gap-3 lg:grid-cols-4">
+      <div className="grid grid-cols-2 gap-3 lg:grid-cols-3">
         <Stat label="Total spend" value={formatINR(total)} sub={project ? `since ${formatDate(project.startDate)}` : undefined} />
         <Stat label="This month" value={formatINR(periodSpend)} />
         <Stat label="Transactions" value={String(totalAgg._count)} />
+        <Stat label="Funding received" value={formatINR(totalFunding)} />
+        <Stat
+          label="Balance"
+          value={formatINR(fundingVariance.variance)}
+          sub={totalFunding > 0 ? 'funding − spend' : undefined}
+        />
         <Stat
           label="Planned (month)"
           value={formatINR(totalPlanned)}
           badge={variance.status ? <StatusBadge status={usedStatus} /> : undefined}
         />
       </div>
+
+      {/* Funding vs expenditure */}
+      <section className="rounded-lg border border-border bg-surface p-4">
+        <div className="flex items-center justify-between gap-2">
+          <h2 className="font-display text-lg font-semibold">Funding vs expenditure</h2>
+          <Link href={`/projects/${id}/funding`} className="text-sm text-primary hover:underline">
+            Funding
+          </Link>
+        </div>
+        {fundingRows.length > 0 && (
+          <ul className="mt-3 divide-y divide-border">
+            {fundingRows.map((r) => (
+              <li key={r.source} className="flex items-center gap-3 py-2 text-sm">
+                <span className="flex h-8 w-8 shrink-0 items-center justify-center rounded-sm bg-ok-tint text-ok">
+                  <FundingIcon source={r.source} size={16} />
+                </span>
+                <span className="flex-1">{FUNDING_SOURCE_LABEL[r.source as keyof typeof FUNDING_SOURCE_LABEL] ?? r.source}</span>
+                <span className="num shrink-0 font-medium">{formatINR(r.amount)}</span>
+              </li>
+            ))}
+          </ul>
+        )}
+        {fundingVariance.percentUsed !== null ? (
+          <div className="mt-3 border-t border-border pt-3">
+            <ProgressBar
+              percent={fundingVariance.percentUsed}
+              status={(fundingVariance.status ?? 'green') as BudgetStatus}
+              label="Share of funding used"
+            />
+            <p className="num mt-1 text-xs text-ink-3">
+              {Math.round(fundingVariance.percentUsed)}% of {formatINR(totalFunding)} used · received this month{' '}
+              {formatINR(periodFunding)}
+            </p>
+          </div>
+        ) : (
+          <div className="mt-3">
+            <EmptyState
+              title="No funding recorded yet."
+              action={
+                <Link
+                  href={`/projects/${id}/funding`}
+                  className="inline-flex min-h-11 items-center text-sm font-medium text-primary hover:underline"
+                >
+                  Record funding received
+                </Link>
+              }
+            />
+          </div>
+        )}
+      </section>
 
       {/* Chart: md+ only; phones get the progress rows below */}
       <section className="hidden rounded-lg border border-border bg-surface p-4 md:block">

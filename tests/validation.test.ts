@@ -1,12 +1,15 @@
 import { describe, expect, it } from 'vitest';
 import {
   addMemberSchema,
+  createFundingSchema,
   createProjectSchema,
   createTransactionSchema,
   finalizeAttachmentSchema,
+  fundingSourceSchema,
   presignSchema,
   recordConsentSchema,
   requestDeletionSchema,
+  updateFundingSchema,
   updateProjectSchema,
   updateTransactionSchema,
 } from '../src/lib/validation/schemas';
@@ -62,6 +65,10 @@ describe('presignSchema', () => {
     );
   });
 
+  it('accepts the funding parent type', () => {
+    expect(presignSchema.safeParse({ ...base, parentType: 'funding', mimeType: 'image/png' }).success).toBe(true);
+  });
+
   it('requires a filename', () => {
     expect(presignSchema.safeParse({ projectId: 'p1', parentType: 'transaction', mimeType: 'image/png' }).success).toBe(
       false,
@@ -113,10 +120,71 @@ describe('finalizeAttachmentSchema', () => {
     expect(finalizeAttachmentSchema.safeParse({}).success).toBe(true);
     expect(finalizeAttachmentSchema.safeParse({ transactionId: 't1' }).success).toBe(true);
     expect(finalizeAttachmentSchema.safeParse({ diaryEntryId: 'd1' }).success).toBe(true);
+    expect(finalizeAttachmentSchema.safeParse({ fundingId: 'f1' }).success).toBe(true);
   });
 
-  it('rejects two parents', () => {
+  it('rejects more than one parent', () => {
     expect(finalizeAttachmentSchema.safeParse({ transactionId: 't1', diaryEntryId: 'd1' }).success).toBe(false);
+    expect(finalizeAttachmentSchema.safeParse({ transactionId: 't1', fundingId: 'f1' }).success).toBe(false);
+    expect(finalizeAttachmentSchema.safeParse({ diaryEntryId: 'd1', fundingId: 'f1' }).success).toBe(false);
+  });
+});
+
+describe('createFundingSchema', () => {
+  const base = {
+    source: 'bank' as const,
+    amount: 100000,
+    receivedAt: new Date(Date.now() - 1000),
+    mode: 'bank' as const,
+  };
+
+  it('accepts a valid funding entry', () => {
+    expect(createFundingSchema.safeParse(base).success).toBe(true);
+    expect(createFundingSchema.safeParse({ ...base, sourceName: 'HDFC Bank', reference: 'UTR123' }).success).toBe(
+      true,
+    );
+  });
+
+  it('rejects a non-positive amount and an unknown source', () => {
+    expect(createFundingSchema.safeParse({ ...base, amount: 0 }).success).toBe(false);
+    expect(createFundingSchema.safeParse({ ...base, source: 'crypto' }).success).toBe(false);
+  });
+
+  it('rejects a future receivedAt', () => {
+    expect(createFundingSchema.safeParse({ ...base, receivedAt: new Date(Date.now() + 86_400_000) }).success).toBe(
+      false,
+    );
+  });
+
+  it('caps attachmentIds at 10', () => {
+    expect(createFundingSchema.safeParse({ ...base, attachmentIds: ['a1'] }).success).toBe(true);
+    expect(
+      createFundingSchema.safeParse({ ...base, attachmentIds: Array.from({ length: 11 }, (_, i) => `a${i}`) }).success,
+    ).toBe(false);
+  });
+});
+
+describe('updateFundingSchema', () => {
+  it('allows partial updates with an optimistic-lock version', () => {
+    expect(updateFundingSchema.safeParse({ amount: 500 }).success).toBe(true);
+    expect(updateFundingSchema.safeParse({ version: 2 }).success).toBe(true);
+    expect(updateFundingSchema.safeParse({ version: -1 }).success).toBe(false);
+  });
+
+  it('rejects an unknown source', () => {
+    expect(updateFundingSchema.safeParse({ source: 'nope' }).success).toBe(false);
+  });
+});
+
+describe('fundingSourceSchema', () => {
+  it('accepts every source in the fixed vocabulary', () => {
+    for (const s of ['bank', 'client', 'customer', 'peer_lending', 'self', 'grant', 'investor', 'other']) {
+      expect(fundingSourceSchema.safeParse(s).success).toBe(true);
+    }
+  });
+
+  it('rejects anything else', () => {
+    expect(fundingSourceSchema.safeParse('loan').success).toBe(false);
   });
 });
 

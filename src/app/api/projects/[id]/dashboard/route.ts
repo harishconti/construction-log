@@ -18,7 +18,7 @@ export const GET = handle<Ctx>(async (req, { params: paramsPromise }) => {
   if (!periodStart) throw ApiError.badRequest('Invalid period parameter', 'INVALID_PERIOD');
   const { start, end } = periodRange('month', periodStart);
 
-  const [totalAgg, periodAgg, grouped, budgets, categories, recentTx, recentDiary] = await Promise.all([
+  const [totalAgg, periodAgg, grouped, budgets, categories, recentTx, recentDiary, fundingAgg, periodFundingAgg, fundingGrouped] = await Promise.all([
     prisma.transaction.aggregate({ where: { projectId: params.id, deletedAt: null }, _sum: { amount: true }, _count: true }),
     prisma.transaction.aggregate({
       where: { projectId: params.id, deletedAt: null, occurredAt: { gte: start, lt: end } },
@@ -43,6 +43,16 @@ export const GET = handle<Ctx>(async (req, { params: paramsPromise }) => {
       take: 3,
       select: { id: true, entryDate: true, title: true },
     }),
+    prisma.funding.aggregate({ where: { projectId: params.id, deletedAt: null }, _sum: { amount: true } }),
+    prisma.funding.aggregate({
+      where: { projectId: params.id, deletedAt: null, receivedAt: { gte: start, lt: end } },
+      _sum: { amount: true },
+    }),
+    prisma.funding.groupBy({
+      by: ['source'],
+      where: { projectId: params.id, deletedAt: null },
+      _sum: { amount: true },
+    }),
   ]);
 
   const nameById = new Map(categories.map((c) => [c.id, c.name]));
@@ -58,12 +68,22 @@ export const GET = handle<Ctx>(async (req, { params: paramsPromise }) => {
 
   const totalPlanned = budgets.reduce((s, b) => s + Number(b.plannedAmount), 0);
   const periodActual = Number(periodAgg._sum.amount ?? 0);
+  const totalSpend = Number(totalAgg._sum.amount ?? 0);
+  const totalFunding = Number(fundingAgg._sum.amount ?? 0);
+  const periodFunding = Number(periodFundingAgg._sum.amount ?? 0);
+  const bySource = fundingGrouped
+    .map((g) => ({ source: g.source, amount: Number(g._sum.amount ?? 0) }))
+    .sort((a, b) => b.amount - a.amount);
 
   return json({
     periodStart: periodStart.toISOString(),
-    totalSpend: Number(totalAgg._sum.amount ?? 0),
+    totalSpend,
     transactionCount: totalAgg._count,
+    totalFunding,
     period: { spend: periodActual, ...computeVariance(totalPlanned, periodActual) },
+    // Funding as the available "plan", spend as "actual": balance = funding − spend.
+    funding: { received: totalFunding, period: periodFunding, ...computeVariance(totalFunding, totalSpend) },
+    bySource,
     byCategory,
     recentTransactions: recentTx.map((t) => ({
       id: t.id,

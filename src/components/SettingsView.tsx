@@ -23,12 +23,30 @@ type Project = {
 };
 type Category = { id: string; name: string; type: string; isActive: boolean };
 
-const CATEGORY_TYPES = ['material', 'labour', 'tax', 'utility', 'misc'];
+const CATEGORY_TYPES = [
+  'material',
+  'labour',
+  'tax',
+  'utility',
+  'equipment',
+  'transport',
+  'professional',
+  'subcontract',
+  'overhead',
+  'finance',
+  'misc',
+];
 const TYPE_LABEL: Record<string, string> = {
   material: 'Material',
   labour: 'Labour',
   tax: 'Tax',
   utility: 'Utility',
+  equipment: 'Equipment',
+  transport: 'Transport',
+  professional: 'Professional',
+  subcontract: 'Subcontract',
+  overhead: 'Overhead',
+  finance: 'Finance',
   misc: 'Misc',
 };
 

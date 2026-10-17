@@ -82,7 +82,7 @@ model Category {
   id        String  @id @default(cuid())
   projectId String
   name      String  // e.g. "Cement", "Labour", "GST", "Electricity"
-  type      String  // 'material' | 'labour' | 'tax' | 'utility' | 'misc'
+  type      String  // 'material' | 'labour' | 'tax' | 'utility' | 'equipment' | 'transport' | 'professional' | 'subcontract' | 'overhead' | 'finance' | 'misc'
   isActive  Boolean @default(true)
 
   project      Project       @relation(fields: [projectId], references: [id], onDelete: Cascade)
@@ -118,6 +118,31 @@ model Transaction {
   @@index([createdBy])
 }
 
+model Funding {
+  id          String    @id @default(cuid())
+  projectId   String
+  source      String    // 'bank' | 'client' | 'customer' | 'peer_lending' | 'self' | 'grant' | 'investor' | 'other'
+  sourceName  String?   // free-text party: bank / client / customer / lender
+  amount      Decimal   @db.Decimal(12, 2)
+  receivedAt  DateTime
+  mode        String    // 'cash' | 'upi' | 'bank' | 'card' | 'credit'
+  reference   String?   // cheque no / UTR / loan account no
+  description String?
+  version     Int       @default(0) // optimistic locking
+  createdBy   String
+  createdAt   DateTime  @default(now())
+  updatedAt   DateTime  @updatedAt
+  deletedAt   DateTime? // soft delete
+
+  project       Project      @relation(fields: [projectId], references: [id], onDelete: Cascade)
+  createdByUser User         @relation(fields: [createdBy], references: [id])
+  attachments   Attachment[]
+
+  @@index([projectId, receivedAt])
+  @@index([projectId, source])
+  @@index([createdBy])
+}
+
 model DiaryEntry {
   id        String   @id @default(cuid())
   projectId String
@@ -143,6 +168,7 @@ model Attachment {
   // Exactly one parent once attached; enforced by a CHECK constraint.
   transactionId String?
   diaryEntryId  String?
+  fundingId     String?
   status        String   @default("pending") // 'pending' | 'ready'
   fileKey       String   // server-generated R2 object key; never trust a client key
   originalName  String?  // sanitized client filename (download header only)
@@ -155,11 +181,13 @@ model Attachment {
   project      Project      @relation(fields: [projectId], references: [id], onDelete: Cascade)
   transaction  Transaction? @relation(fields: [transactionId], references: [id], onDelete: Cascade)
   diaryEntry   DiaryEntry?  @relation(fields: [diaryEntryId], references: [id], onDelete: Cascade)
+  funding      Funding?     @relation(fields: [fundingId], references: [id], onDelete: Cascade)
   uploader     User         @relation(fields: [uploadedBy], references: [id])
 
   @@index([projectId])
   @@index([transactionId])
   @@index([diaryEntryId])
+  @@index([fundingId])
   @@index([status])
 }
 
@@ -293,8 +321,12 @@ model DeletionRequest {
   download-only via an app-proxied endpoint (`GET /api/attachments/:id/download`). No public URL is stored.
 - **Allowed types** — inline: jpeg/png/webp/gif; download-only: pdf/txt/csv/xls/xlsx/heic/heif. Active
   types (html, svg, js, archives) are rejected. Per-file cap 10 MB; ≤10 files per record.
-- **Exactly-one-parent** — an attached `Attachment` references either a `transaction` or a
-  `diary_entry`, enforced by a DB `CHECK` (pending rows have neither).
+- **Exactly-one-parent** — an attached `Attachment` references either a `transaction`, a `funding`
+  entry or a `diary_entry`, enforced by a DB `CHECK` (pending rows have none).
+- **Funding is the money-in side** — a separate `Funding` model (not a signed `Transaction`) keeps the
+  expenditure ledger clean; each row has a fixed `source`, an optional free-text party, an amount, a
+  received date, a payment `mode` and an optional R2 proof. The dashboard compares funding received with
+  spend to show a balance and the share of funding used.
 - **Two-phase upload** — `pending` row at presign, `ready` after the object is verified. A scheduled
   job reclaims orphaned `pending` rows and retries R2 deletions.
 - **Pending invitations** — an admin can invite an email before that person has an account; the
@@ -322,6 +354,7 @@ model DeletionRequest {
 
 ## Constraints & Correctness
 - `amount > 0`; `0 <= gstAmount <= amount`; `occurredAt` not in the future (server-side).
+- `Funding`: `amount > 0`; `receivedAt` not in the future; `source`/`mode` in the fixed vocabularies.
 - `periodStart` aligned to Monday (week) or the 1st (month) in `Asia/Kolkata`.
 - Prisma relations must validate before migration; polymorphic relations are replaced by explicit
   nullable FKs so the schema compiles.
@@ -331,15 +364,15 @@ model DeletionRequest {
 Implemented (migrations under `prisma/migrations`: `init`, `attachment_parent_check`,
 `idempotency_response`, `object_deletion_queue`, `attachment_original_name`, `invitations`,
 `invitation_expiry`, `rate_limit`, `enum_checks`, `invite_links`, `consent_and_deletion`,
-`project_location`): `User.id` = Neon Auth id with no `passwordHash` (and `deletedAt` for erased
-accounts); `version` columns on Project/Transaction/DiaryEntry/Budget; `Attachment` with
-`transactionId`/`diaryEntryId`/`status`/`size`/`originalName`; the `attachment_parent_check` and
+`project_location`, `funding`): `User.id` = Neon Auth id with no `passwordHash` (and `deletedAt` for erased
+accounts); `version` columns on Project/Transaction/Funding/DiaryEntry/Budget; `Attachment` with
+`transactionId`/`diaryEntryId`/`fundingId`/`status`/`size`/`originalName`; the `attachment_parent_check` and
 `attachment_status_check` CHECK constraints; `IdempotencyKey` with a stored `response`; `ObjectDeletion`
 retry queue; `Invitation` (pre-signup invites, expiring); `RateLimit` fixed-window counters;
 `ConsentRecord` and `DeletionRequest` (DPDP consent + erasure); optional `Project` location/geotag with
 the `project_coordinates_pair_check` constraint. Enum-like columns (`Project.status`,
-`ProjectMember.role`, `Invitation.role`, `Transaction.paymentMode`, `Category.type`,
-`Budget.periodType`, `DeletionRequest.status`) also carry DB `CHECK` constraints. Prisma uses pooled
-`DATABASE_URL` + direct `DIRECT_URL`.
+`ProjectMember.role`, `Invitation.role`, `Transaction.paymentMode`, `Funding.source`, `Funding.mode`,
+`Category.type`, `Budget.periodType`, `DeletionRequest.status`) also carry DB `CHECK` constraints. Prisma
+uses pooled `DATABASE_URL` + direct `DIRECT_URL`.
 
 Pending: `checksum` column population.

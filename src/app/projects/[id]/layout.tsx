@@ -14,6 +14,7 @@ type Item = { href: string; label: string; icon: NavIcon };
 const NAV: Item[] = [
   { href: '', label: 'Dashboard', icon: 'dashboard' },
   { href: '/transactions', label: 'Expenses', icon: 'transactions' },
+  { href: '/funding', label: 'Funding', icon: 'funding' },
   { href: '/timeline', label: 'Timeline', icon: 'timeline' },
   { href: '/diary', label: 'Diary', icon: 'diary' },
   { href: '/budgets', label: 'Budgets', icon: 'budgets' },

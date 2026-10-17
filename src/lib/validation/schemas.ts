@@ -1,14 +1,28 @@
 import { z } from 'zod';
 import { isAllowedMime, sizeLimitFor } from '../files';
 import { ROLES } from '../roles';
+import { FUNDING_SOURCES } from '../funding';
 import { CALENDAR_DATE, istDateToInstant } from '../period';
 import { CONSENT_PURPOSE_KEYS, POLICY_VERSION, missingRequiredPurposes } from '../legal';
 
 export const paymentModeSchema = z.enum(['cash', 'upi', 'bank', 'card', 'credit']);
-export const categoryTypeSchema = z.enum(['material', 'labour', 'tax', 'utility', 'misc']);
+export const categoryTypeSchema = z.enum([
+  'material',
+  'labour',
+  'tax',
+  'utility',
+  'equipment',
+  'transport',
+  'professional',
+  'subcontract',
+  'overhead',
+  'finance',
+  'misc',
+]);
+export const fundingSourceSchema = z.enum(FUNDING_SOURCES);
 export const roleSchema = z.enum(ROLES);
 export const projectStatusSchema = z.enum(['active', 'paused', 'completed']);
-export const parentTypeSchema = z.enum(['transaction', 'diary_entry']);
+export const parentTypeSchema = z.enum(['transaction', 'diary_entry', 'funding']);
 
 const FUTURE_TOLERANCE_MS = 60_000;
 
@@ -173,6 +187,52 @@ export const updateTransactionSchema = z
   });
 
 // ---------------------------------------------------------------------------
+// Funding (money in)
+// ---------------------------------------------------------------------------
+
+export const createFundingSchema = z
+  .object({
+    source: fundingSourceSchema,
+    sourceName: z.string().trim().max(200).optional().nullable(),
+    amount: moneyPositive,
+    receivedAt: dateInput,
+    mode: paymentModeSchema,
+    reference: z.string().trim().max(200).optional().nullable(),
+    description: z.string().trim().max(2000).optional().nullable(),
+    attachmentIds: z.array(z.string().min(1)).max(10).optional(),
+  })
+  .superRefine((val, ctx) => {
+    if (val.receivedAt.getTime() > Date.now() + FUTURE_TOLERANCE_MS) {
+      ctx.addIssue({
+        code: z.ZodIssueCode.custom,
+        path: ['receivedAt'],
+        message: 'Received date cannot be in the future',
+      });
+    }
+  });
+
+export const updateFundingSchema = z
+  .object({
+    source: fundingSourceSchema.optional(),
+    sourceName: z.string().trim().max(200).optional().nullable(),
+    amount: moneyPositive.optional(),
+    receivedAt: dateInput.optional(),
+    mode: paymentModeSchema.optional(),
+    reference: z.string().trim().max(200).optional().nullable(),
+    description: z.string().trim().max(2000).optional().nullable(),
+    version: z.number().int().min(0).optional(),
+  })
+  .superRefine((val, ctx) => {
+    if (val.receivedAt && val.receivedAt.getTime() > Date.now() + FUTURE_TOLERANCE_MS) {
+      ctx.addIssue({
+        code: z.ZodIssueCode.custom,
+        path: ['receivedAt'],
+        message: 'Received date cannot be in the future',
+      });
+    }
+  });
+
+// ---------------------------------------------------------------------------
 // Diary entries
 // ---------------------------------------------------------------------------
 
@@ -236,8 +296,9 @@ export const finalizeAttachmentSchema = z
   .object({
     transactionId: z.string().min(1).optional(),
     diaryEntryId: z.string().min(1).optional(),
+    fundingId: z.string().min(1).optional(),
   })
-  .refine((v) => !(v.transactionId && v.diaryEntryId), {
+  .refine((v) => [v.transactionId, v.diaryEntryId, v.fundingId].filter(Boolean).length <= 1, {
     message: 'An attachment can have at most one parent',
   });
 
@@ -288,6 +349,8 @@ export type CreateCategoryInput = z.infer<typeof createCategorySchema>;
 export type UpdateCategoryInput = z.infer<typeof updateCategorySchema>;
 export type CreateTransactionInput = z.infer<typeof createTransactionSchema>;
 export type UpdateTransactionInput = z.infer<typeof updateTransactionSchema>;
+export type CreateFundingInput = z.infer<typeof createFundingSchema>;
+export type UpdateFundingInput = z.infer<typeof updateFundingSchema>;
 export type CreateDiaryInput = z.infer<typeof createDiarySchema>;
 export type UpdateDiaryInput = z.infer<typeof updateDiarySchema>;
 export type CreateBudgetInput = z.infer<typeof createBudgetSchema>;

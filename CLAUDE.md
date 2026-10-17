@@ -43,8 +43,8 @@ only). Use the `/testing` and `/e2e-testing` skills.
   and 404 when a child row's `projectId` doesn't match. Use the `/new-api-route` skill.
 - **Mutations** run in `prisma.$transaction` and call `writeAudit(tx, …)` with the **same `tx`**.
 - **Optimistic locking**: `updateMany({ where: { id, version } , data: { …, version: { increment: 1 } } })`
-  and 409 `VERSION_CONFLICT` when `count === 0`. Applies to Project, Transaction, DiaryEntry, Budget.
-- **Creates** of transactions/diary go through `withIdempotency` (`Idempotency-Key` header); the UI
+  and 409 `VERSION_CONFLICT` when `count === 0`. Applies to Project, Transaction, Funding, DiaryEntry, Budget.
+- **Creates** of transactions/funding/diary go through `withIdempotency` (`Idempotency-Key` header); the UI
   reuses one key across retries (`newIdempotencyKey()` in `api-client.ts`).
 - **Money**: `Decimal(12,2)`; validate with the schema helpers (>0, ≤2 dp); serialise as **strings**
   (`amount.toString()`); `gstAmount ≤ amount`. Display with `formatINR`.

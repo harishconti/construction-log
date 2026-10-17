@@ -40,7 +40,7 @@ export const POST = handle<Ctx>(async (req, { params: paramsPromise }) => {
   }
 
   const body = await parseJson(req, finalizeAttachmentSchema);
-  await assertParent(attachment.projectId, body.transactionId, body.diaryEntryId);
+  await assertParent(attachment.projectId, body.transactionId, body.diaryEntryId, body.fundingId);
 
   // Already finalized: no-op, or link if it is still unlinked.
   if (attachment.status === 'ready') {
@@ -94,6 +94,7 @@ export const POST = handle<Ctx>(async (req, { params: paramsPromise }) => {
         mimeType: storedMime,
         ...(body.transactionId ? { transactionId: body.transactionId } : {}),
         ...(body.diaryEntryId ? { diaryEntryId: body.diaryEntryId } : {}),
+        ...(body.fundingId ? { fundingId: body.fundingId } : {}),
       },
     });
     if (res.count === 0) {
@@ -111,6 +112,7 @@ export const POST = handle<Ctx>(async (req, { params: paramsPromise }) => {
         mimeType: storedMime,
         transactionId: body.transactionId,
         diaryEntryId: body.diaryEntryId,
+        fundingId: body.fundingId,
       },
     });
     return tx.attachment.findUniqueOrThrow({ where: { id: attachment.id } });
@@ -119,7 +121,12 @@ export const POST = handle<Ctx>(async (req, { params: paramsPromise }) => {
   return json({ attachment: await serializeAttachment(updated) });
 });
 
-async function assertParent(projectId: string, transactionId?: string, diaryEntryId?: string) {
+async function assertParent(
+  projectId: string,
+  transactionId?: string,
+  diaryEntryId?: string,
+  fundingId?: string,
+) {
   if (transactionId) {
     const parent = await prisma.transaction.findUnique({ where: { id: transactionId } });
     if (!parent || parent.projectId !== projectId) {
@@ -133,26 +140,36 @@ async function assertParent(projectId: string, transactionId?: string, diaryEntr
       throw ApiError.badRequest('Diary entry does not belong to this project');
     }
   }
+  if (fundingId) {
+    const parent = await prisma.funding.findUnique({ where: { id: fundingId } });
+    if (!parent || parent.projectId !== projectId) {
+      throw ApiError.badRequest('Funding entry does not belong to this project');
+    }
+    if (parent.deletedAt) throw ApiError.badRequest('Funding entry is deleted', 'FUNDING_DELETED');
+  }
 }
 
-async function linkIfNeeded(
-  attachment: Attachment,
-  body: { transactionId?: string; diaryEntryId?: string },
-  actorId: string,
-) {
-  const desiredParent = body.transactionId ?? body.diaryEntryId ?? null;
-  const currentParent = attachment.transactionId ?? attachment.diaryEntryId ?? null;
+type ParentBody = { transactionId?: string; diaryEntryId?: string; fundingId?: string };
 
-  if (!desiredParent || currentParent === desiredParent) {
+function desiredParent(body: ParentBody) {
+  if (body.transactionId) return { field: 'transactionId' as const, id: body.transactionId };
+  if (body.diaryEntryId) return { field: 'diaryEntryId' as const, id: body.diaryEntryId };
+  if (body.fundingId) return { field: 'fundingId' as const, id: body.fundingId };
+  return null;
+}
+
+async function linkIfNeeded(attachment: Attachment, body: ParentBody, actorId: string) {
+  const desired = desiredParent(body);
+  const current = attachment.transactionId ?? attachment.diaryEntryId ?? attachment.fundingId ?? null;
+
+  if (!desired || current === desired.id) {
     return serializeAttachment(attachment);
   }
-  if (currentParent) {
+  if (current) {
     throw ApiError.conflict('Attachment is already linked to another record');
   }
 
-  const parentField = body.transactionId ? 'transactionId' : 'diaryEntryId';
-  const parentId = body.transactionId ?? body.diaryEntryId ?? '';
-  const count = await prisma.attachment.count({ where: { [parentField]: parentId } });
+  const count = await prisma.attachment.count({ where: { [desired.field]: desired.id } });
   if (count >= MAX_FILES_PER_RECORD) {
     throw ApiError.badRequest(`At most ${MAX_FILES_PER_RECORD} attachments per record`, 'TOO_MANY_ATTACHMENTS');
   }
@@ -163,11 +180,9 @@ async function linkIfNeeded(
       status: 'ready',
       transactionId: null,
       diaryEntryId: null,
+      fundingId: null,
     },
-    data: {
-      ...(body.transactionId ? { transactionId: body.transactionId } : {}),
-      ...(body.diaryEntryId ? { diaryEntryId: body.diaryEntryId } : {}),
-    },
+    data: { [desired.field]: desired.id },
   });
   if (result.count === 0) {
     throw ApiError.conflict('Attachment is already linked to another record');
@@ -179,7 +194,7 @@ async function linkIfNeeded(
       entityId: attachment.id,
       action: 'finalize',
       actorId,
-      after: { linked: true, transactionId: body.transactionId, diaryEntryId: body.diaryEntryId },
+      after: { linked: true, [desired.field]: desired.id },
     },
   });
   return serializeAttachment(fresh);

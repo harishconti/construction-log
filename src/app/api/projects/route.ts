@@ -9,6 +9,13 @@ const DEFAULT_CATEGORIES: { name: string; type: string }[] = [
   { name: 'Labour', type: 'labour' },
   { name: 'GST', type: 'tax' },
   { name: 'Electricity', type: 'utility' },
+  { name: 'Transport', type: 'transport' },
+  { name: 'Equipment hire', type: 'equipment' },
+  { name: 'Professional fees', type: 'professional' },
+  { name: 'Permits & approvals', type: 'professional' },
+  { name: 'Subcontractor', type: 'subcontract' },
+  { name: 'Site overheads', type: 'overhead' },
+  { name: 'Interest & finance', type: 'finance' },
   { name: 'Misc', type: 'misc' },
 ];
 

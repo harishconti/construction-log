@@ -8,6 +8,7 @@ import {
   ChevronRight,
   LayoutDashboard,
   LogOut,
+  PiggyBank,
   Receipt,
   Settings as SettingsIcon,
   Users,
@@ -19,6 +20,7 @@ import { authClient } from '@/lib/auth/client';
 const ICONS: Record<string, LucideIcon> = {
   dashboard: LayoutDashboard,
   transactions: Receipt,
+  funding: PiggyBank,
   timeline: CalendarDays,
   diary: BookOpen,
   budgets: Wallet,

@@ -10,7 +10,7 @@ export const MAX_FILES = 10;
 export const MAX_FILE_BYTES = 10 * 1024 * 1024;
 const ACCEPT = 'image/*,.pdf,.txt,.csv,.xls,.xlsx';
 
-type ParentType = 'transaction' | 'diary_entry';
+type ParentType = 'transaction' | 'diary_entry' | 'funding';
 type Status = 'compressing' | 'uploading' | 'uploaded' | 'error';
 
 export type PendingUpload = {
@@ -129,7 +129,7 @@ export function useUploads(projectId: string, parentType: ParentType, existingCo
 
   /** Finalize every uploaded file; returns their attachment ids. */
   const finalizeAll = useCallback(
-    async (link?: { transactionId: string } | { diaryEntryId: string }): Promise<string[]> => {
+    async (link?: { transactionId: string } | { diaryEntryId: string } | { fundingId: string }): Promise<string[]> => {
       const ids: string[] = [];
       for (const i of itemsRef.current) {
         if (i.status !== 'uploaded' || !i.attachmentId) continue;

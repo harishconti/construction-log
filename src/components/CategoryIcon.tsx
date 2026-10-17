@@ -1,4 +1,17 @@
-import { BrickWall, HardHat, Percent, Receipt, Zap, type LucideIcon } from 'lucide-react';
+import {
+  BrickWall,
+  Briefcase,
+  Building2,
+  HardHat,
+  Landmark,
+  Percent,
+  Receipt,
+  Truck,
+  Users,
+  Wrench,
+  Zap,
+  type LucideIcon,
+} from 'lucide-react';
 
 // One glyph per category *type* (see categoryTypeSchema) so rows are recognisable at a glance.
 const ICONS: Record<string, LucideIcon> = {
@@ -6,6 +19,12 @@ const ICONS: Record<string, LucideIcon> = {
   labour: HardHat,
   utility: Zap,
   tax: Percent,
+  equipment: Wrench,
+  transport: Truck,
+  professional: Briefcase,
+  subcontract: Users,
+  overhead: Building2,
+  finance: Landmark,
   misc: Receipt,
 };
 

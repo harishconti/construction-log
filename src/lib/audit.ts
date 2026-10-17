@@ -2,6 +2,7 @@ import { Prisma } from '@prisma/client';
 
 export type AuditEntity =
   | 'transaction'
+  | 'funding'
   | 'diary_entry'
   | 'budget'
   | 'project'

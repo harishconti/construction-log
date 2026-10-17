@@ -2,7 +2,13 @@ import { Prisma } from '@prisma/client';
 import { ApiError } from './api';
 import { MAX_FILES_PER_RECORD } from './files';
 
-type Parent = 'transaction' | 'diary';
+type Parent = 'transaction' | 'diary' | 'funding';
+
+const PARENT_FIELD: Record<Parent, 'transactionId' | 'diaryEntryId' | 'fundingId'> = {
+  transaction: 'transactionId',
+  diary: 'diaryEntryId',
+  funding: 'fundingId',
+};
 
 /**
  * Links finalized (status=ready) attachments to a parent record.
@@ -17,7 +23,7 @@ export async function linkAttachments(
 ): Promise<void> {
   if (opts.attachmentIds.length === 0) return;
 
-  const field = opts.parent === 'transaction' ? 'transactionId' : 'diaryEntryId';
+  const field = PARENT_FIELD[opts.parent];
 
   const existingCount = await tx.attachment.count({ where: { [field]: opts.parentId } });
   if (existingCount + opts.attachmentIds.length > MAX_FILES_PER_RECORD) {
@@ -29,7 +35,14 @@ export async function linkAttachments(
 
   const existing = await tx.attachment.findMany({
     where: { id: { in: opts.attachmentIds } },
-    select: { id: true, projectId: true, status: true, transactionId: true, diaryEntryId: true },
+    select: {
+      id: true,
+      projectId: true,
+      status: true,
+      transactionId: true,
+      diaryEntryId: true,
+      fundingId: true,
+    },
   });
   if (existing.length !== opts.attachmentIds.length) {
     throw ApiError.badRequest('One or more attachments were not found');
@@ -37,7 +50,7 @@ export async function linkAttachments(
   for (const a of existing) {
     if (a.projectId !== opts.projectId) throw ApiError.badRequest('Attachment belongs to another project');
     if (a.status !== 'ready') throw ApiError.badRequest('Attachment has not been finalized');
-    if (a.transactionId || a.diaryEntryId) throw ApiError.badRequest('Attachment is already attached');
+    if (a.transactionId || a.diaryEntryId || a.fundingId) throw ApiError.badRequest('Attachment is already attached');
   }
 
   const result = await tx.attachment.updateMany({
@@ -47,6 +60,7 @@ export async function linkAttachments(
       status: 'ready',
       transactionId: null,
       diaryEntryId: null,
+      fundingId: null,
     },
     data: { [field]: opts.parentId },
   });

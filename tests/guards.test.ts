@@ -165,13 +165,21 @@ describe('withIdempotency', () => {
 });
 
 describe('linkAttachments', () => {
-  type Row = { id: string; projectId: string; status: string; transactionId: string | null; diaryEntryId: string | null };
+  type Row = {
+    id: string;
+    projectId: string;
+    status: string;
+    transactionId: string | null;
+    diaryEntryId: string | null;
+    fundingId: string | null;
+  };
   const ready = (id: string, over: Partial<Row> = {}): Row => ({
     id,
     projectId: 'p1',
     status: 'ready',
     transactionId: null,
     diaryEntryId: null,
+    fundingId: null,
     ...over,
   });
   function tx(rows: Row[], { already = 0, updated = rows.length } = {}) {
@@ -190,8 +198,31 @@ describe('linkAttachments', () => {
     const t = tx([ready('a'), ready('b')]);
     await expect(link(t, ['a', 'b'])).resolves.toBeUndefined();
     expect(t.attachment.updateMany).toHaveBeenCalledWith({
-      where: { id: { in: ['a', 'b'] }, projectId: 'p1', status: 'ready', transactionId: null, diaryEntryId: null },
+      where: {
+        id: { in: ['a', 'b'] },
+        projectId: 'p1',
+        status: 'ready',
+        transactionId: null,
+        diaryEntryId: null,
+        fundingId: null,
+      },
       data: { transactionId: 't1' },
+    });
+  });
+
+  it('links attachments to a funding parent', async () => {
+    const t = tx([ready('a')]);
+    await linkAttachments(asTx(t), { projectId: 'p1', parent: 'funding', parentId: 'f1', attachmentIds: ['a'] });
+    expect(t.attachment.updateMany).toHaveBeenCalledWith({
+      where: {
+        id: { in: ['a'] },
+        projectId: 'p1',
+        status: 'ready',
+        transactionId: null,
+        diaryEntryId: null,
+        fundingId: null,
+      },
+      data: { fundingId: 'f1' },
     });
   });
 
@@ -210,6 +241,7 @@ describe('linkAttachments', () => {
     ['another project', ready('a', { projectId: 'p2' }), /another project/],
     ['pending upload', ready('a', { status: 'pending' }), /not been finalized/],
     ['already linked', ready('a', { diaryEntryId: 'd1' }), /already attached/],
+    ['already linked to funding', ready('a', { fundingId: 'f1' }), /already attached/],
   ])('rejects an attachment from %s', async (_label, row, msg) => {
     await expect(link(tx([row]), ['a'])).rejects.toThrow(msg);
   });

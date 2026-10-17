@@ -60,6 +60,20 @@ member of project A cannot read or write project B.
 > **Permission note:** editors may create and edit **any** transaction in the project; only admins
 > may soft-delete or restore. (Current code enforces "own only" — reconcile to "any" _(to implement)_.)
 
+## Funding (money in)
+| Method | Path | Description | Min Role |
+|---|---|---|---|
+| GET | /api/projects/:id/funding | List with filters (source, party name, date range) + pagination | viewer |
+| POST | /api/projects/:id/funding | Create (with optional finalized `attachmentIds`) | editor |
+| PATCH | /api/projects/:id/funding/:fundingId | Update | editor (any entry) |
+| DELETE | /api/projects/:id/funding/:fundingId | Soft delete | admin |
+| POST | /api/projects/:id/funding/:fundingId/restore | Restore soft-deleted | admin |
+
+- `source` is a fixed vocabulary: `bank` | `client` | `customer` | `peer_lending` | `self` | `grant` |
+  `investor` | `other`. `mode` reuses the transaction payment modes. `amount` must be positive;
+  `receivedAt` may not be in the future.
+- Loan repayments/interest are recorded as expenses under a `finance` category, not as funding.
+
 ## Diary Entries
 | Method | Path | Description | Min Role |
 |---|---|---|---|

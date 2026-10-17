@@ -11,14 +11,14 @@ This document reflects the **actual repository state**. For the target design se
 - **Vercel** target; `build` runs `prisma generate && next build`; Node `22.x`; daily cleanup cron (`vercel.json`).
 
 ## Data model (implemented)
-`User, Project, ProjectMember, Invitation, Category, Transaction, DiaryEntry, Attachment, Budget, BudgetRevision,
+`User, Project, ProjectMember, Invitation, Category, Transaction, Funding, DiaryEntry, Attachment, Budget, BudgetRevision,
 AuditLog, IdempotencyKey, ObjectDeletion, RateLimit, ConsentRecord, DeletionRequest`.
 
 Key properties in place:
 - `User.id` = Neon Auth user id (no stored password); `deletedAt` marks an anonymised (erased) account.
-- `version` on Project/Transaction/DiaryEntry/Budget (optimistic locking).
-- `Attachment`: `transactionId`/`diaryEntryId` (exactly one when attached), `status` (pending|ready), `size`.
-- DB CHECK constraints: attachment at-most-one-parent; pending has no parent; status enum; `DeletionRequest.status` enum.
+- `version` on Project/Transaction/Funding/DiaryEntry/Budget (optimistic locking).
+- `Attachment`: `transactionId`/`diaryEntryId`/`fundingId` (exactly one when attached), `status` (pending|ready), `size`.
+- DB CHECK constraints: attachment at-most-one-parent; pending has no parent; status enum; `DeletionRequest.status` enum; `Funding.source`/`Funding.mode` enums; `Category.type` (expanded).
 - `IdempotencyKey` stores the response for replay.
 - `ObjectDeletion` retry queue for deferred R2 deletions.
 - `ConsentRecord` — append-only DPDP consent grants (policy version, itemised purposes, evidence).
@@ -26,9 +26,8 @@ Key properties in place:
 
 Migrations: `init`, `attachment_parent_check`, `idempotency_response`, `object_deletion_queue`,
 `attachment_original_name`, `invitations`, `invitation_expiry`, `rate_limit`, `enum_checks`, `invite_links`,
-`consent_and_deletion`
-(applied to the Neon `dev` branch; **apply to production before deploying** the invite-link code and the
-DPDP consent/erasure code).
+`consent_and_deletion`, `project_location`, `funding`
+(applied to the Neon `dev` branch; **apply to production before deploying** the funding code).
 
 ## API endpoints (implemented)
 | Area | Endpoints |
@@ -38,6 +37,7 @@ DPDP consent/erasure code).
 | Members | `GET/POST /api/projects/:id/members`; `PATCH/DELETE /api/projects/:id/members/:userId`; `DELETE /api/projects/:id/invitations/:invitationId`; `GET/POST /api/projects/:id/invite-links`; `DELETE /api/projects/:id/invite-links/:linkId`; `POST /api/invite-links/:token/accept` |
 | Categories | `GET/POST /api/projects/:id/categories`; `PATCH /api/projects/:id/categories/:catId` |
 | Transactions | `GET/POST /api/projects/:id/transactions`; `PATCH/DELETE /api/projects/:id/transactions/:txId`; `POST …/restore` |
+| Funding | `GET/POST /api/projects/:id/funding`; `PATCH/DELETE /api/projects/:id/funding/:fundingId`; `POST …/restore` |
 | Diary | `GET/POST /api/projects/:id/diary`; `PATCH/DELETE /api/projects/:id/diary/:entryId` |
 | Budgets | `GET/POST /api/projects/:id/budgets`; `PATCH /api/projects/:id/budgets/:budgetId`; `GET …/revisions` |
 | Feed | `GET /api/projects/:id/timeline`; `GET /api/projects/:id/dashboard` |
@@ -52,8 +52,9 @@ checkbox) · `/terms` · `/privacy` (public legal pages) · `/blog` + `/blog/:sl
 expenses, budgets, diary, team, use cases, data) · `/consent` (consent gate for new accounts and
 after a policy-version change) · `/account` (consent status, optional-purpose preferences and the
 account-deletion flow) · `/projects` (list/create) · `/projects/:id`
-(Dashboard + chart) · `/transactions` (filters, pagination, add/edit, admin soft-delete/restore) ·
-`/timeline` · `/diary` (author/admin edit with add/remove photos, admin delete) · `/budgets` ·
+(Dashboard + chart + funding-vs-expenditure) · `/transactions` (filters, pagination, add/edit, admin soft-delete/restore) ·
+`/funding` (money in: sources, filters, pagination, add/edit, admin soft-delete/restore) ·
+`/timeline` (funding, expenses and diary together) · `/diary` (author/admin edit with add/remove photos, admin delete) · `/budgets` ·
 `/more` (mobile menu) · `/members` (admin) · `/settings` (admin, project + categories).
 Attachments render as image thumbnails (lightbox) or document download chips, with inline remove.
 Nav: desktop sidebar; mobile bottom tabs (Dashboard/Transactions/Diary) + **More**.
@@ -80,6 +81,12 @@ PWA: `manifest.json` + service worker (`public/sw.js`, registered in production)
   file, ≤10 per record. Delete removes the object (deferred retry on failure).
 - **Correctness**: `Idempotency-Key` on transaction/diary create; `version` optimistic locking (409 on stale); audit log written in the same Prisma transaction.
 - **Budgets**: planned vs derived actual (`SUM(amount)`), variance + status (green<80 / yellow 80–100 / red>100); revisions append-only.
+- **Funding (money in)**: a `Funding` ledger parallel to transactions — fixed `source` (bank, client,
+  customer, peer lending, self, grant, investor, other), optional party name, amount, received date,
+  payment mode, reference and proofs. Editor create/edit, admin soft-delete/restore, idempotency,
+  optimistic locking and audit, exactly like expenses. Loan repayments/interest are recorded as expenses
+  under `finance` categories. The dashboard shows funding received, a balance (funding − spend), the
+  share of funding used and a per-source breakdown; funding entries also appear in the timeline.
 - **Time**: `Asia/Kolkata` boundaries; weeks start Monday.
 - **Consent & erasure (DPDP, 2023)**: the app shell (`/projects`, every project page) sends a signed-in
   user with no consent for the current `POLICY_VERSION` through `/consent`, which lists each purpose
@@ -97,8 +104,9 @@ PWA: `manifest.json` + service worker (`public/sw.js`, registered in production)
 - **Maintenance**: reaps `pending` uploads older than 24h, retries deferred R2 deletions (attempt cap + TTL), and processes due account-erasure requests.
 
 ## Verification
-- `npm run typecheck`, `npm run lint`, `npm test` (**162 unit tests**: roles, validation, period/budget
-  math, maintenance auth, file policy + image compression policy, audit regressions, API error mapping/pagination, API client,
+- `npm run typecheck`, `npm run lint`, `npm test` (**178 unit tests**: roles, validation, period/budget
+  math, maintenance auth, file policy + image compression policy, funding source/category vocabulary,
+  audit regressions, API error mapping/pagination, API client,
   INR/IST/coordinate formatting, DPDP consent schemas + erasure processing, project-location rules, and
   server guards — `requireRole`, rate limit, audit write, idempotency, attachment linking, user-mirror
   first-sign-in race — with Prisma mocked), `npm run build` — all green.

@@ -6,7 +6,7 @@ import { requireRole } from '@/lib/requireRole';
 type Ctx = { params: Promise<{ id: string }> };
 
 type MergedItem = {
-  type: 'transaction' | 'diary';
+  type: 'transaction' | 'funding' | 'diary';
   id: string;
   date: Date;
   [k: string]: unknown;
@@ -45,12 +45,17 @@ export const GET = handle<Ctx>(async (req, { params: paramsPromise }) => {
   };
   const hasRange = Object.keys(range).length > 0;
 
-  const [txs, diaries] = await Promise.all([
+  const [txs, fundings, diaries] = await Promise.all([
     prisma.transaction.findMany({
       where: { projectId: params.id, deletedAt: null, ...(hasRange ? { occurredAt: range } : {}) },
       orderBy: [{ occurredAt: 'desc' }, { id: 'desc' }],
       take: limit + 1,
       include: { category: { select: { id: true, name: true, type: true } } },
+    }),
+    prisma.funding.findMany({
+      where: { projectId: params.id, deletedAt: null, ...(hasRange ? { receivedAt: range } : {}) },
+      orderBy: [{ receivedAt: 'desc' }, { id: 'desc' }],
+      take: limit + 1,
     }),
     prisma.diaryEntry.findMany({
       where: { projectId: params.id, ...(hasRange ? { entryDate: range } : {}) },
@@ -72,6 +77,18 @@ export const GET = handle<Ctx>(async (req, { params: paramsPromise }) => {
       description: t.description,
       category: t.category,
       createdBy: t.createdBy,
+    })),
+    ...fundings.map((f) => ({
+      type: 'funding' as const,
+      id: f.id,
+      date: f.receivedAt,
+      amount: f.amount.toString(),
+      source: f.source,
+      sourceName: f.sourceName,
+      mode: f.mode,
+      reference: f.reference,
+      description: f.description,
+      createdBy: f.createdBy,
     })),
     ...diaries.map((d) => ({
       type: 'diary' as const,

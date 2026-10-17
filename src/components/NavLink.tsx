@@ -7,6 +7,7 @@ import {
   CalendarDays,
   LayoutDashboard,
   MoreHorizontal,
+  PiggyBank,
   Receipt,
   Settings as SettingsIcon,
   Users,
@@ -17,6 +18,7 @@ import {
 const ICONS: Record<string, LucideIcon> = {
   dashboard: LayoutDashboard,
   transactions: Receipt,
+  funding: PiggyBank,
   timeline: CalendarDays,
   diary: BookOpen,
   budgets: Wallet,

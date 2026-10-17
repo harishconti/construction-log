@@ -57,6 +57,9 @@ async function main() {
           { name: 'Labour', type: 'labour' },
           { name: 'GST', type: 'tax' },
           { name: 'Electricity', type: 'utility' },
+          { name: 'Transport', type: 'transport' },
+          { name: 'Equipment hire', type: 'equipment' },
+          { name: 'Professional fees', type: 'professional' },
         ],
       },
     },
@@ -86,6 +89,19 @@ async function main() {
       },
     });
   }
+
+  await prisma.funding.create({
+    data: {
+      projectId: project.id,
+      source: 'self',
+      sourceName: 'Own contribution',
+      amount: 300000,
+      receivedAt: new Date(Date.now() - 25 * DAY),
+      mode: 'bank',
+      description: 'Initial self funding',
+      createdBy: userId,
+    },
+  });
 
   console.log('Seed complete.');
   console.log(`  Project: ${project.name} (${project.id})`);
