@@ -35,6 +35,7 @@ export default async function ProjectsPage() {
           name: true,
           description: true,
           status: true,
+          archivedAt: true,
           locationName: true,
           latitude: true,
           longitude: true,
@@ -80,6 +81,9 @@ export default async function ProjectsPage() {
     return lb - la;
   });
 
+  const activeRows = sorted.filter((m) => !m.project.archivedAt);
+  const archivedRows = sorted.filter((m) => m.project.archivedAt);
+
   return (
     <main className="mx-auto max-w-[1200px] p-4 sm:p-6">
       <header className="flex items-center justify-between gap-3">
@@ -102,50 +106,20 @@ export default async function ProjectsPage() {
             <EmptyState title="No projects yet — create your first one." action={<NewProjectForm />} />
           </div>
         ) : (
-          sorted.map((m) => {
-            const st = stats.get(m.project.id);
-            return (
-              <Link
-                key={m.project.id}
-                href={`/projects/${m.project.id}`}
-                className="block min-h-11 min-w-0 rounded-lg border border-border bg-surface p-4 transition hover:border-border-strong hover:shadow-e1"
-              >
-                <div className="flex items-start justify-between gap-2">
-                  <span className="min-w-0 font-display text-lg font-semibold leading-snug line-clamp-2 break-words">
-                    {m.project.name}
-                  </span>
-                  <span className="mt-0.5 flex shrink-0 items-center gap-2">
-                    <span className="rounded-full bg-surface-2 px-2 py-0.5 text-xs text-ink-2">{ROLE_LABEL[m.role] ?? m.role}</span>
-                    <span className={`rounded-full px-2 py-0.5 text-xs font-medium ${STATUS_CLASS[m.project.status] ?? 'bg-surface-2 text-ink-2'}`}>
-                      {STATUS_LABEL[m.project.status] ?? m.project.status}
-                    </span>
-                  </span>
-                </div>
-                {m.project.description && <p className="mt-1 truncate text-sm text-ink-2">{m.project.description}</p>}
-                {(m.project.locationName || (m.project.latitude !== null && m.project.longitude !== null)) && (
-                  <p className="mt-1 flex items-center gap-1 text-sm text-ink-3">
-                    <MapPin size={14} aria-hidden className="shrink-0" />
-                    <span className="truncate">
-                      {m.project.locationName ||
-                        formatCoords(m.project.latitude as number, m.project.longitude as number)}
-                    </span>
-                  </p>
-                )}
-                <dl className="mt-3 flex flex-wrap gap-x-6 gap-y-1 text-sm">
-                  <div>
-                    <dt className="text-xs text-ink-3">Total spend</dt>
-                    <dd className="num font-semibold">{formatINR(st?.total ?? 0)}</dd>
-                  </div>
-                  <div>
-                    <dt className="text-xs text-ink-3">Last activity</dt>
-                    <dd className="text-ink-2">{st?.last ? formatDayLabel(st.last) : 'No entries yet'}</dd>
-                  </div>
-                </dl>
-              </Link>
-            );
-          })
+          activeRows.map((m) => <ProjectCard key={m.project.id} m={m} st={stats.get(m.project.id)} />)
         )}
       </section>
+
+      {archivedRows.length > 0 && (
+        <section className="mt-8">
+          <h2 className="font-display text-lg font-semibold text-ink-2">Archived</h2>
+          <div className="mt-3 grid gap-3 md:grid-cols-2">
+            {archivedRows.map((m) => (
+              <ProjectCard key={m.project.id} m={m} st={stats.get(m.project.id)} />
+            ))}
+          </div>
+        </section>
+      )}
 
       <footer className="mt-8 flex flex-wrap gap-x-4 gap-y-1 border-t border-border pt-4 text-sm text-ink-3">
         <Link href="/account" className="hover:text-ink">
@@ -162,5 +136,62 @@ export default async function ProjectsPage() {
         </Link>
       </footer>
     </main>
+  );
+}
+
+type ProjectRow = {
+  role: string;
+  project: {
+    id: string;
+    name: string;
+    description: string | null;
+    status: string;
+    archivedAt: Date | null;
+    locationName: string | null;
+    latitude: number | null;
+    longitude: number | null;
+  };
+};
+
+function ProjectCard({ m, st }: { m: ProjectRow; st?: { total: number; last: Date | null } }) {
+  return (
+    <Link
+      href={`/projects/${m.project.id}`}
+      className="block min-h-11 min-w-0 rounded-lg border border-border bg-surface p-4 transition hover:border-border-strong hover:shadow-e1"
+    >
+      <div className="flex items-start justify-between gap-2">
+        <span className="min-w-0 font-display text-lg font-semibold leading-snug line-clamp-2 break-words">
+          {m.project.name}
+        </span>
+        <span className="mt-0.5 flex shrink-0 items-center gap-2">
+          {m.project.archivedAt && (
+            <span className="rounded-full bg-surface-2 px-2 py-0.5 text-xs font-medium text-ink-2">Archived</span>
+          )}
+          <span className="rounded-full bg-surface-2 px-2 py-0.5 text-xs text-ink-2">{ROLE_LABEL[m.role] ?? m.role}</span>
+          <span className={`rounded-full px-2 py-0.5 text-xs font-medium ${STATUS_CLASS[m.project.status] ?? 'bg-surface-2 text-ink-2'}`}>
+            {STATUS_LABEL[m.project.status] ?? m.project.status}
+          </span>
+        </span>
+      </div>
+      {m.project.description && <p className="mt-1 truncate text-sm text-ink-2">{m.project.description}</p>}
+      {(m.project.locationName || (m.project.latitude !== null && m.project.longitude !== null)) && (
+        <p className="mt-1 flex items-center gap-1 text-sm text-ink-3">
+          <MapPin size={14} aria-hidden className="shrink-0" />
+          <span className="truncate">
+            {m.project.locationName || formatCoords(m.project.latitude as number, m.project.longitude as number)}
+          </span>
+        </p>
+      )}
+      <dl className="mt-3 flex flex-wrap gap-x-6 gap-y-1 text-sm">
+        <div>
+          <dt className="text-xs text-ink-3">Total spend</dt>
+          <dd className="num font-semibold">{formatINR(st?.total ?? 0)}</dd>
+        </div>
+        <div>
+          <dt className="text-xs text-ink-3">Last activity</dt>
+          <dd className="text-ink-2">{st?.last ? formatDayLabel(st.last) : 'No entries yet'}</dd>
+        </div>
+      </dl>
+    </Link>
   );
 }

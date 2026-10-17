@@ -21,9 +21,12 @@ member of project A cannot read or write project B.
 | Method | Path | Description | Min Role |
 |---|---|---|---|
 | POST | /api/projects | Create project (creator becomes admin) | Any logged-in |
-| GET | /api/projects | List my projects | Any logged-in |
+| GET | /api/projects | List my projects (`?includeArchived=true`) | Any logged-in |
 | GET | /api/projects/:id | Project detail | viewer |
 | PATCH | /api/projects/:id | Update project settings | admin |
+| DELETE | /api/projects/:id | Delete the project and everything in it (R2 objects queued) | admin |
+| POST | /api/projects/:id/archive | Archive (hide from the default list; kept intact) | admin |
+| POST | /api/projects/:id/unarchive | Restore an archived project | admin |
 | GET | /api/projects/:id/members | List members | viewer |
 | GET | /api/projects/:id/members | List members **and pending invitations** | viewer |
 | POST | /api/projects/:id/members | Add member by email + role; if no account exists yet, stores a pending invitation claimed on sign-up | admin |
@@ -47,6 +50,11 @@ member of project A cannot read or write project B.
 | GET | /api/projects/:id/categories | List categories (`?includeInactive=true`) | viewer |
 | POST | /api/projects/:id/categories | Create category | admin |
 | PATCH | /api/projects/:id/categories/:catId | Update/rename/deactivate | admin |
+
+> Default categories are seeded on project create (Material, Labour, Electricity, Transport, Equipment
+> hire, Professional fees, Permits & approvals, Subcontractor, Site overheads, Interest & finance, Misc).
+> There is **no GST category** — GST is the per-expense `gstAmount` field (a component of `amount`), so a
+> tax category would double-count the same money. The `tax` type remains available for other taxes.
 
 ## Transactions
 | Method | Path | Description | Min Role |

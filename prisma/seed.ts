@@ -55,7 +55,6 @@ async function main() {
           { name: 'Cement', type: 'material' },
           { name: 'Steel', type: 'material' },
           { name: 'Labour', type: 'labour' },
-          { name: 'GST', type: 'tax' },
           { name: 'Electricity', type: 'utility' },
           { name: 'Transport', type: 'transport' },
           { name: 'Equipment hire', type: 'equipment' },

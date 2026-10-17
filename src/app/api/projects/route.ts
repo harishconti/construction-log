@@ -4,10 +4,11 @@ import { prisma } from '@/lib/prisma';
 import { writeAudit } from '@/lib/audit';
 import { createProjectSchema } from '@/lib/validation/schemas';
 
+// GST is tracked as the per-expense `gstAmount` field (a component of `amount`), so there is no
+// "GST" category by default — a tax category would double-count the same money.
 const DEFAULT_CATEGORIES: { name: string; type: string }[] = [
   { name: 'Material', type: 'material' },
   { name: 'Labour', type: 'labour' },
-  { name: 'GST', type: 'tax' },
   { name: 'Electricity', type: 'utility' },
   { name: 'Transport', type: 'transport' },
   { name: 'Equipment hire', type: 'equipment' },
@@ -19,10 +20,11 @@ const DEFAULT_CATEGORIES: { name: string; type: string }[] = [
   { name: 'Misc', type: 'misc' },
 ];
 
-export const GET = handle(async () => {
+export const GET = handle(async (req) => {
   const user = await requireUser();
+  const includeArchived = new URL(req.url).searchParams.get('includeArchived') === 'true';
   const memberships = await prisma.projectMember.findMany({
-    where: { userId: user.id },
+    where: { userId: user.id, ...(includeArchived ? {} : { project: { archivedAt: null } }) },
     orderBy: { createdAt: 'asc' },
     select: {
       role: true,
@@ -32,6 +34,7 @@ export const GET = handle(async () => {
           name: true,
           description: true,
           status: true,
+          archivedAt: true,
           startDate: true,
           locationName: true,
           latitude: true,

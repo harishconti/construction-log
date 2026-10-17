@@ -40,7 +40,7 @@ export default async function ProjectLayout({
       select: { role: true, project: { select: { name: true } } },
     }),
     prisma.projectMember.findMany({
-      where: { userId: user.id },
+      where: { userId: user.id, project: { archivedAt: null } },
       orderBy: { createdAt: 'asc' },
       select: { project: { select: { id: true, name: true } } },
     }),

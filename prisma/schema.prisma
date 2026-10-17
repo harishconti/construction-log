@@ -46,6 +46,7 @@ model Project {
   description String?
   startDate   DateTime
   status      String   @default("active") // active | paused | completed
+  archivedAt  DateTime? // archived projects are hidden from the default list but kept intact
   locationName String? // human-readable site location, optional
   latitude    Float?   // site coordinates, optional (set/cleared together with `longitude`)
   longitude   Float?
@@ -214,7 +215,6 @@ model Attachment {
   originalName  String? // client filename, sanitized, used only for the download header
   mimeType      String
   size          Int? // bytes, verified at finalize
-  checksum      String? // optional content hash
   uploadedBy    String
   uploadedAt    DateTime @default(now())
 

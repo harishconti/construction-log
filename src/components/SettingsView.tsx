@@ -1,10 +1,12 @@
 'use client';
 
 import { useCallback, useEffect, useState } from 'react';
-import { Archive, ArchiveRestore, Check, ChevronDown, Pencil, Plus, Save } from 'lucide-react';
+import { useRouter } from 'next/navigation';
+import { Archive, ArchiveRestore, Check, ChevronDown, Pencil, Plus, Save, Trash2 } from 'lucide-react';
 import { api } from '@/lib/api-client';
 import { Button } from '@/components/ui/Button';
 import { Alert } from '@/components/ui/Alert';
+import { ConfirmDialog } from '@/components/ui/ConfirmDialog';
 import { Field, Select, TextInput, Textarea, DateInput } from '@/components/ui/inputs';
 import { LocationFields, type LocationValue } from '@/components/LocationFields';
 import { useToast } from '@/components/ui/Toast';
@@ -16,6 +18,7 @@ type Project = {
   description: string | null;
   startDate: string;
   status: string;
+  archivedAt: string | null;
   locationName: string | null;
   latitude: number | null;
   longitude: number | null;
@@ -52,7 +55,12 @@ const TYPE_LABEL: Record<string, string> = {
 
 export function SettingsView({ projectId, initialProject }: { projectId: string; initialProject: Project }) {
   const toast = useToast();
+  const router = useRouter();
   const [project, setProject] = useState(initialProject);
+  const [archivedAt, setArchivedAt] = useState(initialProject.archivedAt);
+  const [archiving, setArchiving] = useState(false);
+  const [deleting, setDeleting] = useState(false);
+  const [confirmDelete, setConfirmDelete] = useState(false);
   const [name, setName] = useState(initialProject.name);
   const [description, setDescription] = useState(initialProject.description ?? '');
   const [startDate, setStartDate] = useState(todayIST(new Date(initialProject.startDate)));
@@ -159,6 +167,36 @@ export function SettingsView({ projectId, initialProject }: { projectId: string;
 
   const active = categories.filter((c) => c.isActive);
   const inactive = categories.filter((c) => !c.isActive);
+
+  async function toggleArchive() {
+    setError(null);
+    setArchiving(true);
+    try {
+      const archiving = !archivedAt;
+      await api.post(`/api/projects/${projectId}/${archiving ? 'archive' : 'unarchive'}`);
+      setArchivedAt(archiving ? new Date().toISOString() : null);
+      toast.notify(archiving ? 'Project archived' : 'Project unarchived');
+      router.refresh();
+    } catch (err) {
+      setError(err instanceof Error ? err.message : 'Failed to change archive state');
+    } finally {
+      setArchiving(false);
+    }
+  }
+
+  async function deleteProject() {
+    setError(null);
+    setDeleting(true);
+    try {
+      await api.delete(`/api/projects/${projectId}`);
+      router.push('/projects');
+      router.refresh();
+    } catch (err) {
+      setError(err instanceof Error ? err.message : 'Failed to delete project');
+      setDeleting(false);
+      setConfirmDelete(false);
+    }
+  }
 
   return (
     <div className="space-y-6">
@@ -288,6 +326,33 @@ export function SettingsView({ projectId, initialProject }: { projectId: string;
           </div>
         )}
       </section>
+
+      <section className="rounded-lg border border-border bg-surface p-4">
+        <h2 className="font-display text-lg font-semibold text-danger">Danger zone</h2>
+        <p className="mt-1 text-sm text-ink-2">
+          Archiving hides this project from your list but keeps every expense, funding entry, photo and
+          note. Deleting removes the project and everything in it, permanently.
+        </p>
+        <div className="mt-3 flex flex-wrap gap-2">
+          <Button variant="secondary" onClick={() => void toggleArchive()} loading={archiving}>
+            {!archiving && (archivedAt ? <ArchiveRestore size={16} aria-hidden /> : <Archive size={16} aria-hidden />)}
+            {archivedAt ? 'Unarchive project' : 'Archive project'}
+          </Button>
+          <Button variant="danger" onClick={() => setConfirmDelete(true)} loading={deleting}>
+            {!deleting && <Trash2 size={16} aria-hidden />} Delete project
+          </Button>
+        </div>
+      </section>
+
+      <ConfirmDialog
+        open={confirmDelete}
+        title="Delete this project?"
+        message="This permanently removes the project and all of its expenses, funding, diary entries and photos. This cannot be undone."
+        confirmLabel="Delete permanently"
+        destructive
+        onConfirm={() => void deleteProject()}
+        onCancel={() => setConfirmDelete(false)}
+      />
     </div>
   );
 }

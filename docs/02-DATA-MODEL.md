@@ -31,6 +31,7 @@ model Project {
   description  String?
   startDate    DateTime
   status       String   @default("active") // active | paused | completed
+  archivedAt   DateTime? // soft archive: hidden from the default list, kept intact (to unarchive/delete)
   locationName String?  // optional site place name
   latitude     Float?   // optional geotag (set/cleared together with longitude; DB CHECK)
   longitude    Float?
@@ -174,7 +175,6 @@ model Attachment {
   originalName  String?  // sanitized client filename (download header only)
   mimeType      String
   size          Int?     // bytes, verified at finalize
-  checksum      String?  // optional content hash (not populated)
   uploadedBy    String
   uploadedAt    DateTime @default(now())
 
@@ -364,7 +364,7 @@ model DeletionRequest {
 Implemented (migrations under `prisma/migrations`: `init`, `attachment_parent_check`,
 `idempotency_response`, `object_deletion_queue`, `attachment_original_name`, `invitations`,
 `invitation_expiry`, `rate_limit`, `enum_checks`, `invite_links`, `consent_and_deletion`,
-`project_location`, `funding`): `User.id` = Neon Auth id with no `passwordHash` (and `deletedAt` for erased
+`project_location`, `funding`, `project_archive`): `User.id` = Neon Auth id with no `passwordHash` (and `deletedAt` for erased
 accounts); `version` columns on Project/Transaction/Funding/DiaryEntry/Budget; `Attachment` with
 `transactionId`/`diaryEntryId`/`fundingId`/`status`/`size`/`originalName`; the `attachment_parent_check` and
 `attachment_status_check` CHECK constraints; `IdempotencyKey` with a stored `response`; `ObjectDeletion`
@@ -375,4 +375,5 @@ the `project_coordinates_pair_check` constraint. Enum-like columns (`Project.sta
 `Category.type`, `Budget.periodType`, `DeletionRequest.status`) also carry DB `CHECK` constraints. Prisma
 uses pooled `DATABASE_URL` + direct `DIRECT_URL`.
 
-Pending: `checksum` column population.
+Archiving is a nullable `Project.archivedAt` (not a `status` value), so it needs no CHECK change and
+composes with `active`/`paused`/`completed`.

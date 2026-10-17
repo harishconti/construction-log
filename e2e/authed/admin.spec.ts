@@ -152,3 +152,36 @@ test('the last admin cannot be demoted or removed (409)', async ({ request }) =>
   const { members } = await (await request.get(api('/members'))).json();
   expect(members.find((m: { user: { id: string } }) => m.user.id === myUserId)?.role).toBe('admin');
 });
+
+test('a project can be archived (hidden from the list) and unarchived', async ({ request }) => {
+  expect((await request.post(api('/archive'))).ok()).toBeTruthy();
+
+  const def = await (await request.get('/api/projects')).json();
+  expect(def.projects.some((p: { id: string }) => p.id === projectId)).toBe(false);
+  const all = await (await request.get('/api/projects?includeArchived=true')).json();
+  const row = all.projects.find((p: { id: string }) => p.id === projectId);
+  expect(row?.archivedAt).toBeTruthy();
+
+  expect((await request.post(api('/unarchive'))).ok()).toBeTruthy();
+  const back = await (await request.get('/api/projects')).json();
+  expect(back.projects.some((p: { id: string }) => p.id === projectId)).toBe(true);
+});
+
+test('a project can be deleted entirely (cascade)', async ({ request }) => {
+  const created = await request.post('/api/projects', {
+    data: { name: `E2E delete ${stamp}`, startDate: todayIST() },
+  });
+  expect(created.status()).toBe(201);
+  const id = (await created.json()).project.id;
+
+  const cats = await (await request.get(`/api/projects/${id}/categories`)).json();
+  const tx = await request.post(`/api/projects/${id}/transactions`, {
+    data: { categoryId: cats.categories[0].id, occurredAt: todayIST(), amount: 1, gstAmount: 0, paymentMode: 'cash' },
+  });
+  expect(tx.status()).toBe(201);
+
+  expect((await request.delete(`/api/projects/${id}`)).ok()).toBeTruthy();
+  expect((await request.get(`/api/projects/${id}`)).status()).toBe(404);
+  const list = await (await request.get('/api/projects?includeArchived=true')).json();
+  expect(list.projects.some((p: { id: string }) => p.id === id)).toBe(false);
+});

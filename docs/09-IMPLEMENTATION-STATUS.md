@@ -17,6 +17,7 @@ AuditLog, IdempotencyKey, ObjectDeletion, RateLimit, ConsentRecord, DeletionRequ
 Key properties in place:
 - `User.id` = Neon Auth user id (no stored password); `deletedAt` marks an anonymised (erased) account.
 - `version` on Project/Transaction/Funding/DiaryEntry/Budget (optimistic locking).
+- `Project.archivedAt` — soft archive (hidden from the default list, kept intact; unarchive or delete).
 - `Attachment`: `transactionId`/`diaryEntryId`/`fundingId` (exactly one when attached), `status` (pending|ready), `size`.
 - DB CHECK constraints: attachment at-most-one-parent; pending has no parent; status enum; `DeletionRequest.status` enum; `Funding.source`/`Funding.mode` enums; `Category.type` (expanded).
 - `IdempotencyKey` stores the response for replay.
@@ -26,14 +27,14 @@ Key properties in place:
 
 Migrations: `init`, `attachment_parent_check`, `idempotency_response`, `object_deletion_queue`,
 `attachment_original_name`, `invitations`, `invitation_expiry`, `rate_limit`, `enum_checks`, `invite_links`,
-`consent_and_deletion`, `project_location`, `funding`
+`consent_and_deletion`, `project_location`, `funding`, `project_archive`
 (applied to the Neon `dev` branch; **apply to production before deploying** the funding code).
 
 ## API endpoints (implemented)
 | Area | Endpoints |
 |---|---|
 | Auth | `ALL /api/auth/[...path]` (Neon Auth proxy) |
-| Projects | `GET/POST /api/projects`; `GET/PATCH /api/projects/:id` |
+| Projects | `GET/POST /api/projects`; `GET/PATCH/DELETE /api/projects/:id`; `POST …/archive`; `POST …/unarchive` |
 | Members | `GET/POST /api/projects/:id/members`; `PATCH/DELETE /api/projects/:id/members/:userId`; `DELETE /api/projects/:id/invitations/:invitationId`; `GET/POST /api/projects/:id/invite-links`; `DELETE /api/projects/:id/invite-links/:linkId`; `POST /api/invite-links/:token/accept` |
 | Categories | `GET/POST /api/projects/:id/categories`; `PATCH /api/projects/:id/categories/:catId` |
 | Transactions | `GET/POST /api/projects/:id/transactions`; `PATCH/DELETE /api/projects/:id/transactions/:txId`; `POST …/restore` |
@@ -51,11 +52,11 @@ Migrations: `init`, `attachment_parent_check`, `idempotency_response`, `object_d
 checkbox) · `/terms` · `/privacy` (public legal pages) · `/blog` + `/blog/:slug` (public guides: setup,
 expenses, budgets, diary, team, use cases, data) · `/consent` (consent gate for new accounts and
 after a policy-version change) · `/account` (consent status, optional-purpose preferences and the
-account-deletion flow) · `/projects` (list/create) · `/projects/:id`
+account-deletion flow) · `/projects` (list/create, archived projects in a separate section) · `/projects/:id`
 (Dashboard + chart + funding-vs-expenditure) · `/transactions` (filters, pagination, add/edit, admin soft-delete/restore) ·
 `/funding` (money in: sources, filters, pagination, add/edit, admin soft-delete/restore) ·
 `/timeline` (funding, expenses and diary together) · `/diary` (author/admin edit with add/remove photos, admin delete) · `/budgets` ·
-`/more` (mobile menu) · `/members` (admin) · `/settings` (admin, project + categories).
+`/more` (mobile menu) · `/members` (admin) · `/settings` (admin, project + categories + archive/delete).
 Attachments render as image thumbnails (lightbox) or document download chips, with inline remove.
 Nav: desktop sidebar; mobile bottom tabs (Dashboard/Transactions/Diary) + **More**.
 PWA: `manifest.json` + service worker (`public/sw.js`, registered in production).
@@ -87,6 +88,11 @@ PWA: `manifest.json` + service worker (`public/sw.js`, registered in production)
   optimistic locking and audit, exactly like expenses. Loan repayments/interest are recorded as expenses
   under `finance` categories. The dashboard shows funding received, a balance (funding − spend), the
   share of funding used and a per-source breakdown; funding entries also appear in the timeline.
+- **Project lifecycle**: an admin can **archive** a project (hidden from the default list, kept intact —
+  unarchive later) or **delete** it outright (the whole ledger and diary cascade away; its attachment
+  objects are queued to `ObjectDeletion`). Archiving is a nullable `Project.archivedAt`, so it composes
+  with `active`/`paused`/`completed`. GST is tracked as the per-expense `gstAmount` field, not a
+  category, so totals never double-count it.
 - **Time**: `Asia/Kolkata` boundaries; weeks start Monday.
 - **Consent & erasure (DPDP, 2023)**: the app shell (`/projects`, every project page) sends a signed-in
   user with no consent for the current `POLICY_VERSION` through `/consent`, which lists each purpose

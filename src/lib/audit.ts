@@ -17,6 +17,8 @@ export type AuditAction =
   | 'update'
   | 'delete'
   | 'restore'
+  | 'archive'
+  | 'unarchive'
   | 'role_change'
   | 'finalize'
   | 'cancel';

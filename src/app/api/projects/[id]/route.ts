@@ -19,6 +19,7 @@ export const GET = handle<Ctx>(async (_req, { params: paramsPromise }) => {
       name: true,
       description: true,
       status: true,
+      archivedAt: true,
       startDate: true,
       locationName: true,
       latitude: true,
@@ -80,4 +81,33 @@ export const PATCH = handle<Ctx>(async (req, { params: paramsPromise }) => {
   });
 
   return json({ project });
+});
+
+export const DELETE = handle<Ctx>(async (_req, { params: paramsPromise }) => {
+  const { id } = await paramsPromise;
+  const user = await requireUser();
+  await requireRole(id, user.id, 'admin');
+
+  const project = await prisma.project.findUnique({ where: { id } });
+  if (!project) throw ApiError.notFound('Project not found');
+
+  await prisma.$transaction(async (tx) => {
+    // Queue the R2 objects before the cascade removes the Attachment rows that reference them.
+    const attachments = await tx.attachment.findMany({ where: { projectId: id }, select: { fileKey: true } });
+    if (attachments.length > 0) {
+      await tx.objectDeletion.createMany({
+        data: attachments.map((a) => ({ projectId: id, fileKey: a.fileKey, lastError: 'project deleted' })),
+      });
+    }
+    await writeAudit(tx, {
+      entity: 'project',
+      entityId: id,
+      action: 'delete',
+      actorId: user.id,
+      before: project,
+    });
+    await tx.project.delete({ where: { id } });
+  });
+
+  return json({ ok: true });
 });
