@@ -4,6 +4,7 @@ export type AuditEntity =
   | 'transaction'
   | 'funding'
   | 'vendor'
+  | 'stage'
   | 'diary_entry'
   | 'budget'
   | 'project'

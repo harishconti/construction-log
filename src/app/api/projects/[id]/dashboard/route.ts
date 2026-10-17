@@ -4,6 +4,7 @@ import { prisma } from '@/lib/prisma';
 import { requireRole } from '@/lib/requireRole';
 import { computeVariance } from '@/lib/budget';
 import { parsePeriodParam, periodRange, startOfMonthIST } from '@/lib/period';
+import { listStages } from '@/lib/queries';
 
 type Ctx = { params: Promise<{ id: string }> };
 
@@ -18,7 +19,7 @@ export const GET = handle<Ctx>(async (req, { params: paramsPromise }) => {
   if (!periodStart) throw ApiError.badRequest('Invalid period parameter', 'INVALID_PERIOD');
   const { start, end } = periodRange('month', periodStart);
 
-  const [totalAgg, periodAgg, grouped, budgets, categories, recentTx, recentDiary, fundingAgg, periodFundingAgg, fundingGrouped] = await Promise.all([
+  const [totalAgg, periodAgg, grouped, budgets, categories, recentTx, recentDiary, fundingAgg, periodFundingAgg, fundingGrouped, stages, project] = await Promise.all([
     prisma.transaction.aggregate({ where: { projectId: params.id, deletedAt: null }, _sum: { amount: true }, _count: true }),
     prisma.transaction.aggregate({
       where: { projectId: params.id, deletedAt: null, occurredAt: { gte: start, lt: end } },
@@ -53,6 +54,8 @@ export const GET = handle<Ctx>(async (req, { params: paramsPromise }) => {
       where: { projectId: params.id, deletedAt: null },
       _sum: { amount: true },
     }),
+    listStages(params.id),
+    prisma.project.findUnique({ where: { id: params.id }, select: { totalBudget: true } }),
   ]);
 
   const nameById = new Map(categories.map((c) => [c.id, c.name]));
@@ -80,10 +83,20 @@ export const GET = handle<Ctx>(async (req, { params: paramsPromise }) => {
     totalSpend,
     transactionCount: totalAgg._count,
     totalFunding,
+    totalBudget: project?.totalBudget ? project.totalBudget.toString() : null,
+    estimate: project?.totalBudget ? computeVariance(Number(project.totalBudget), totalSpend) : null,
     period: { spend: periodActual, ...computeVariance(totalPlanned, periodActual) },
     // Funding as the available "plan", spend as "actual": balance = funding − spend.
     funding: { received: totalFunding, period: periodFunding, ...computeVariance(totalFunding, totalSpend) },
     bySource,
+    byStage: stages.map((s) => ({
+      id: s.id,
+      name: s.name,
+      planned: s.planned,
+      actual: s.actual,
+      percentUsed: s.percentUsed,
+      status: s.status,
+    })),
     byCategory,
     recentTransactions: recentTx.map((t) => ({
       id: t.id,

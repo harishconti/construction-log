@@ -31,7 +31,8 @@ model Project {
   description  String?
   startDate    DateTime
   status       String   @default("active") // active | paused | completed
-  archivedAt   DateTime? // soft archive: hidden from the default list, kept intact (to unarchive/delete)
+  archivedAt   DateTime? // soft archive: hidden from the default list, kept intact
+  totalBudget  Decimal? @db.Decimal(12, 2) // overall project estimate (optional)
   locationName String?  // optional site place name
   latitude     Float?   // optional geotag (set/cleared together with longitude; DB CHECK)
   longitude    Float?
@@ -115,6 +116,29 @@ model Vendor {
   @@index([projectId, isActive])
 }
 
+/// A phase of the build (foundation, slab, brickwork, finishing…) with an optional planned amount and
+/// dates. Transactions can be tagged to a stage so spend reads per stage against the estimate.
+model Stage {
+  id            String    @id @default(cuid())
+  projectId     String
+  name          String
+  plannedAmount Decimal?  @db.Decimal(12, 2)
+  plannedStart  DateTime?
+  plannedEnd    DateTime?
+  order         Int       @default(0)
+  version       Int       @default(0)
+  createdBy     String
+  createdAt     DateTime  @default(now())
+  updatedAt     DateTime  @updatedAt
+
+  project       Project       @relation(fields: [projectId], references: [id], onDelete: Cascade)
+  createdByUser User          @relation(fields: [createdBy], references: [id])
+  transactions  Transaction[]
+
+  @@unique([projectId, name])
+  @@index([projectId, order])
+}
+
 model Transaction {
   id          String    @id @default(cuid())
   projectId   String
@@ -124,6 +148,7 @@ model Transaction {
   gstAmount   Decimal   @default(0) @db.Decimal(12, 2) // tax component already inside `amount`
   vendor      String?   // name snapshot (kept in sync with `vendorEntity` on read)
   vendorId    String?   // linked Vendor, resolved from the name
+  stageId     String?   // optional Stage this expense belongs to
   paymentMode String    // 'cash' | 'upi' | 'bank' | 'card' | 'credit'
   description String?
   version     Int       @default(0) // optimistic locking (to implement)
@@ -135,12 +160,14 @@ model Transaction {
   project       Project      @relation(fields: [projectId], references: [id], onDelete: Cascade)
   category      Category     @relation(fields: [categoryId], references: [id])
   vendorEntity  Vendor?      @relation(fields: [vendorId], references: [id], onDelete: SetNull)
+  stage         Stage?       @relation(fields: [stageId], references: [id], onDelete: SetNull)
   createdByUser User         @relation(fields: [createdBy], references: [id])
   attachments   Attachment[]
 
   @@index([projectId, occurredAt])
   @@index([projectId, categoryId])
   @@index([projectId, vendorId])
+  @@index([projectId, stageId])
   @@index([createdBy])
 }
 
@@ -357,6 +384,10 @@ model DeletionRequest {
   `(projectId, name)` key and links it via `vendorId`. Per-vendor totals, and the balance against an
   optional `contractValue`, are then derived (`SUM(amount)`), never stored. A migration backfills
   vendors and links for names already in the ledger.
+- **Estimate & stages** — `Project.totalBudget` is an optional overall estimate; `Stage` rows are named
+  build phases with an optional planned amount and dates, and `Transaction.stageId` tags an expense.
+  Per-stage actual is derived (`SUM(amount)`), so "% of the estimate spent" and per-stage progress come
+  from the same ledger, never a parallel store.
 - **Two-phase upload** — `pending` row at presign, `ready` after the object is verified. A scheduled
   job reclaims orphaned `pending` rows and retries R2 deletions.
 - **Pending invitations** — an admin can invite an email before that person has an account; the
@@ -394,7 +425,7 @@ model DeletionRequest {
 Implemented (migrations under `prisma/migrations`: `init`, `attachment_parent_check`,
 `idempotency_response`, `object_deletion_queue`, `attachment_original_name`, `invitations`,
 `invitation_expiry`, `rate_limit`, `enum_checks`, `invite_links`, `consent_and_deletion`,
-`project_location`, `funding`, `project_archive`, `vendors`): `User.id` = Neon Auth id with no `passwordHash` (and `deletedAt` for erased
+`project_location`, `funding`, `project_archive`, `vendors`, `stages`): `User.id` = Neon Auth id with no `passwordHash` (and `deletedAt` for erased
 accounts); `version` columns on Project/Transaction/Funding/DiaryEntry/Budget; `Attachment` with
 `transactionId`/`diaryEntryId`/`fundingId`/`status`/`size`/`originalName`; the `attachment_parent_check` and
 `attachment_status_check` CHECK constraints; `IdempotencyKey` with a stored `response`; `ObjectDeletion`

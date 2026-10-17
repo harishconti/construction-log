@@ -41,6 +41,9 @@ const dateInput = z.union([z.string(), z.number(), z.date()]).transform((v, ctx)
   return d;
 });
 
+/** A date input that may also be explicitly cleared with `null`. */
+const nullableDate = z.union([dateInput, z.null()]);
+
 // Money guardrails: fits Decimal(12,2) and at most two decimal places.
 const MAX_MONEY = 9_999_999_999.99;
 const twoDecimals = (v: number) => Math.abs(v * 100 - Math.round(v * 100)) < 1e-6;
@@ -83,6 +86,7 @@ export const createProjectSchema = z
     description: z.string().trim().max(2000).optional().nullable(),
     startDate: dateInput,
     status: projectStatusSchema.optional(),
+    totalBudget: moneyNonNegative.optional().nullable(),
     ...locationFields,
   })
   .superRefine(checkCoordinatePair);
@@ -93,6 +97,7 @@ export const updateProjectSchema = z
     description: z.string().trim().max(2000).optional().nullable(),
     startDate: dateInput.optional(),
     status: projectStatusSchema.optional(),
+    totalBudget: moneyNonNegative.optional().nullable(),
     ...locationFields,
     version: z.number().int().min(0).optional(),
   })
@@ -149,6 +154,27 @@ export const updateVendorSchema = z.object({
 });
 
 // ---------------------------------------------------------------------------
+// Stages (build phases)
+// ---------------------------------------------------------------------------
+
+export const createStageSchema = z.object({
+  name: z.string().trim().min(1).max(120),
+  plannedAmount: moneyNonNegative.optional().nullable(),
+  plannedStart: nullableDate.optional(),
+  plannedEnd: nullableDate.optional(),
+  order: z.number().int().min(0).optional(),
+});
+
+export const updateStageSchema = z.object({
+  name: z.string().trim().min(1).max(120).optional(),
+  plannedAmount: moneyNonNegative.optional().nullable(),
+  plannedStart: nullableDate.optional(),
+  plannedEnd: nullableDate.optional(),
+  order: z.number().int().min(0).optional(),
+  version: z.number().int().min(0).optional(),
+});
+
+// ---------------------------------------------------------------------------
 // Transactions
 // ---------------------------------------------------------------------------
 
@@ -159,6 +185,7 @@ export const createTransactionSchema = z
     amount: moneyPositive,
     gstAmount: moneyNonNegative.default(0),
     vendor: z.string().trim().max(200).optional().nullable(),
+    stageId: z.string().min(1).optional().nullable(),
     paymentMode: paymentModeSchema,
     description: z.string().trim().max(2000).optional().nullable(),
     attachmentIds: z.array(z.string().min(1)).max(10).optional(),
@@ -187,6 +214,7 @@ export const updateTransactionSchema = z
     amount: moneyPositive.optional(),
     gstAmount: moneyNonNegative.optional(),
     vendor: z.string().trim().max(200).optional().nullable(),
+    stageId: z.string().min(1).optional().nullable(),
     paymentMode: paymentModeSchema.optional(),
     description: z.string().trim().max(2000).optional().nullable(),
     version: z.number().int().min(0).optional(),
@@ -371,6 +399,8 @@ export type CreateCategoryInput = z.infer<typeof createCategorySchema>;
 export type UpdateCategoryInput = z.infer<typeof updateCategorySchema>;
 export type CreateVendorInput = z.infer<typeof createVendorSchema>;
 export type UpdateVendorInput = z.infer<typeof updateVendorSchema>;
+export type CreateStageInput = z.infer<typeof createStageSchema>;
+export type UpdateStageInput = z.infer<typeof updateStageSchema>;
 export type CreateTransactionInput = z.infer<typeof createTransactionSchema>;
 export type UpdateTransactionInput = z.infer<typeof updateTransactionSchema>;
 export type CreateFundingInput = z.infer<typeof createFundingSchema>;

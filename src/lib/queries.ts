@@ -1,5 +1,6 @@
 import { Prisma } from '@prisma/client';
 import { prisma } from './prisma';
+import { computeVariance, type BudgetStatus } from './budget';
 import { serializeAttachments } from './serialize';
 
 // Read-side list queries shared by the API routes and the server-rendered pages. Pages use them to
@@ -219,6 +220,57 @@ export async function listVendors(projectId: string, includeInactive = false): P
       paid,
       transactionCount: byId.get(v.id)?.count ?? 0,
       balance: contractValue === null ? null : contractValue - paid,
+    };
+  });
+}
+
+export type StageSummary = {
+  id: string;
+  name: string;
+  plannedAmount: string | null;
+  plannedStart: Date | null;
+  plannedEnd: Date | null;
+  order: number;
+  version: number;
+  actual: number;
+  transactionCount: number;
+  planned: number;
+  variance: number;
+  percentUsed: number | null;
+  status: BudgetStatus | null;
+};
+
+/** Stages with derived spend: actual is always `SUM(transactions.amount)` tagged to the stage. */
+export async function listStages(projectId: string): Promise<StageSummary[]> {
+  const stages = await prisma.stage.findMany({
+    where: { projectId },
+    orderBy: [{ order: 'asc' }, { name: 'asc' }],
+  });
+
+  const ids = stages.map((s) => s.id);
+  const grouped = ids.length
+    ? await prisma.transaction.groupBy({
+        by: ['stageId'],
+        where: { projectId, stageId: { in: ids }, deletedAt: null },
+        _sum: { amount: true },
+        _count: true,
+      })
+    : [];
+  const byId = new Map(grouped.map((g) => [g.stageId, { actual: Number(g._sum.amount ?? 0), count: g._count }]));
+
+  return stages.map((s) => {
+    const actual = byId.get(s.id)?.actual ?? 0;
+    const planned = s.plannedAmount === null ? 0 : Number(s.plannedAmount);
+    return {
+      id: s.id,
+      name: s.name,
+      plannedAmount: s.plannedAmount === null ? null : s.plannedAmount.toString(),
+      plannedStart: s.plannedStart,
+      plannedEnd: s.plannedEnd,
+      order: s.order,
+      version: s.version,
+      transactionCount: byId.get(s.id)?.count ?? 0,
+      ...computeVariance(planned, actual),
     };
   });
 }

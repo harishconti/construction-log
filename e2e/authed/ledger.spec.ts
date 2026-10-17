@@ -152,6 +152,34 @@ test('the vendor is tracked with a running total and an optional contract balanc
   expect(after.balance).toBe(250); // 2000 agreed − 1750 paid
 });
 
+test('expenses can be tagged to a stage and counted against its plan', async ({ request }) => {
+  const created = await request.post(`/api/projects/${projectId}/stages`, {
+    data: { name: `Stage ${stamp.slice(-6)}`, plannedAmount: 3000, order: 1 },
+  });
+  expect(created.status()).toBe(201);
+  const stageId = (await created.json()).stage.id;
+
+  const tx = await firstTx(request);
+  const patched = await request.patch(`/api/projects/${projectId}/transactions/${tx.id}`, {
+    data: { stageId, version: tx.version },
+  });
+  expect(patched.status()).toBe(200);
+
+  const stage = (await (await request.get(`/api/projects/${projectId}/stages`)).json()).stages.find(
+    (s: { id: string }) => s.id === stageId,
+  );
+  expect(stage.actual).toBe(1750);
+  expect(stage.planned).toBe(3000);
+  expect(stage.status).toBe('green'); // 1750 / 3000 = 58%
+
+  // A stage from another project is rejected.
+  const bad = await request.patch(`/api/projects/${projectId}/transactions/${tx.id}`, {
+    data: { stageId: 'does-not-exist', version: tx.version + 1 },
+  });
+  expect(bad.status()).toBe(400);
+  expect((await bad.json()).code).toBe('INVALID_STAGE');
+});
+
 test('add a diary entry', async ({ page }) => {
   await page.goto(`/projects/${projectId}/diary`);
   await page.getByRole('button', { name: 'Add diary entry' }).click();
@@ -164,7 +192,7 @@ test('add a diary entry', async ({ page }) => {
 
 test('no page scrolls sideways on mobile (long project/vendor names)', async ({ page }) => {
   await page.setViewportSize({ width: 360, height: 740 }); // narrowest common Android width
-  for (const path of ['/projects', '', '/transactions', '/funding', '/timeline', '/diary', '/budgets', '/more', '/members', '/settings']) {
+  for (const path of ['/projects', '', '/transactions', '/vendors', '/funding', '/timeline', '/diary', '/budgets', '/stages', '/more', '/members', '/settings']) {
     await page.goto(path === '/projects' ? path : `/projects/${projectId}${path}`);
     await page.waitForLoadState('networkidle');
     const overflow = await page.evaluate(() => document.documentElement.scrollWidth - document.documentElement.clientWidth);

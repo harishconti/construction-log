@@ -35,6 +35,13 @@ export const PATCH = handle<Ctx>(async (req, { params: paramsPromise }) => {
     }
   }
 
+  if (body.stageId) {
+    const stage = await prisma.stage.findUnique({ where: { id: body.stageId } });
+    if (!stage || stage.projectId !== projectId) {
+      throw ApiError.badRequest('Stage does not belong to this project', 'INVALID_STAGE');
+    }
+  }
+
   const updated = await prisma.$transaction(async (tx) => {
     const vendorId =
       body.vendor !== undefined
@@ -49,6 +56,7 @@ export const PATCH = handle<Ctx>(async (req, { params: paramsPromise }) => {
         ...(body.gstAmount !== undefined ? { gstAmount: body.gstAmount } : {}),
         ...(body.vendor !== undefined ? { vendor: body.vendor } : {}),
         ...(vendorId !== undefined ? { vendorId } : {}),
+        ...(body.stageId !== undefined ? { stageId: body.stageId } : {}),
         ...(body.paymentMode !== undefined ? { paymentMode: body.paymentMode } : {}),
         ...(body.description !== undefined ? { description: body.description } : {}),
         version: { increment: 1 },

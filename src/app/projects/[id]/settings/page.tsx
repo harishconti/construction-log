@@ -26,6 +26,7 @@ export default async function SettingsPage({ params }: { params: Promise<{ id: s
       startDate: true,
       status: true,
       archivedAt: true,
+      totalBudget: true,
       locationName: true,
       latitude: true,
       longitude: true,
@@ -37,7 +38,12 @@ export default async function SettingsPage({ params }: { params: Promise<{ id: s
   return (
     <SettingsView
       projectId={id}
-      initialProject={{ ...project, startDate: project.startDate.toISOString(), archivedAt: project.archivedAt ? project.archivedAt.toISOString() : null }}
+      initialProject={{
+        ...project,
+        startDate: project.startDate.toISOString(),
+        archivedAt: project.archivedAt ? project.archivedAt.toISOString() : null,
+        totalBudget: project.totalBudget ? project.totalBudget.toString() : null,
+      }}
     />
   );
 }

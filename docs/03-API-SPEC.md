@@ -81,6 +81,17 @@ member of project A cannot read or write project B.
 > totals work without a separate picker. Renaming a vendor changes how its transactions are displayed.
 > `balance` = contractValue − paid (null when no contract value is set).
 
+## Stages (build phases)
+| Method | Path | Description | Min Role |
+|---|---|---|---|
+| GET | /api/projects/:id/stages | List stages with derived actual spend + variance (`SUM` of tagged transactions) | viewer |
+| POST | /api/projects/:id/stages | Create stage | editor |
+| PATCH | /api/projects/:id/stages/:stageId | Update (name, planned amount, dates, order) | editor |
+| DELETE | /api/projects/:id/stages/:stageId | Delete a stage (tagged transactions are untagged, not lost) | admin |
+
+> `Project.totalBudget` (optional overall estimate) is set through `PATCH /api/projects/:id`.
+> `Transaction` carries an optional `stageId`; a stage id from another project is rejected (`400 INVALID_STAGE`).
+
 ## Funding (money in)
 | Method | Path | Description | Min Role |
 |---|---|---|---|

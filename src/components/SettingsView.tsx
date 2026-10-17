@@ -7,7 +7,7 @@ import { api } from '@/lib/api-client';
 import { Button } from '@/components/ui/Button';
 import { Alert } from '@/components/ui/Alert';
 import { ConfirmDialog } from '@/components/ui/ConfirmDialog';
-import { Field, Select, TextInput, Textarea, DateInput } from '@/components/ui/inputs';
+import { Field, MoneyInput, Select, TextInput, Textarea, DateInput } from '@/components/ui/inputs';
 import { LocationFields, type LocationValue } from '@/components/LocationFields';
 import { useToast } from '@/components/ui/Toast';
 import { todayIST } from '@/lib/period';
@@ -19,6 +19,7 @@ type Project = {
   startDate: string;
   status: string;
   archivedAt: string | null;
+  totalBudget: string | null;
   locationName: string | null;
   latitude: number | null;
   longitude: number | null;
@@ -65,6 +66,7 @@ export function SettingsView({ projectId, initialProject }: { projectId: string;
   const [description, setDescription] = useState(initialProject.description ?? '');
   const [startDate, setStartDate] = useState(todayIST(new Date(initialProject.startDate)));
   const [status, setStatus] = useState(initialProject.status);
+  const [totalBudget, setTotalBudget] = useState(initialProject.totalBudget ?? '');
   const [location, setLocation] = useState<LocationValue>({
     locationName: initialProject.locationName ?? '',
     latitude: initialProject.latitude,
@@ -108,6 +110,7 @@ export function SettingsView({ projectId, initialProject }: { projectId: string;
         description: description || null,
         startDate, // bare YYYY-MM-DD: the server reads it as an IST calendar date
         status,
+        totalBudget: totalBudget === '' ? null : Number(totalBudget),
         locationName: location.locationName.trim() || null,
         latitude: location.latitude,
         longitude: location.longitude,
@@ -225,6 +228,9 @@ export function SettingsView({ projectId, initialProject }: { projectId: string;
             </Select>
           </Field>
         </div>
+        <Field label="Total budget" hint="Overall estimate for the build (optional)">
+          <MoneyInput value={totalBudget} onValueChange={setTotalBudget} placeholder="0" />
+        </Field>
         <LocationFields value={location} onChange={setLocation} />
         <Button type="submit" loading={savingProject}>
           {!savingProject && <Save size={16} aria-hidden />} Save project

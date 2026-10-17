@@ -7,6 +7,7 @@ import {
   CalendarDays,
   ChevronRight,
   HardHat,
+  Layers,
   LayoutDashboard,
   LogOut,
   PiggyBank,
@@ -26,6 +27,7 @@ const ICONS: Record<string, LucideIcon> = {
   timeline: CalendarDays,
   diary: BookOpen,
   budgets: Wallet,
+  stages: Layers,
   members: Users,
   settings: SettingsIcon,
 };

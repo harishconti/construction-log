@@ -60,6 +60,13 @@ export const POST = handle<Ctx>(async (req, { params: paramsPromise }) => {
     throw ApiError.badRequest('Category is inactive', 'INACTIVE_CATEGORY');
   }
 
+  if (body.stageId) {
+    const stage = await prisma.stage.findUnique({ where: { id: body.stageId } });
+    if (!stage || stage.projectId !== params.id) {
+      throw ApiError.badRequest('Stage does not belong to this project', 'INVALID_STAGE');
+    }
+  }
+
   const { data: transaction } = await withIdempotency(
     { projectId: params.id, userId: user.id, key: req.headers.get('idempotency-key'), body },
     async (tx) => {
@@ -77,6 +84,7 @@ export const POST = handle<Ctx>(async (req, { params: paramsPromise }) => {
           gstAmount: body.gstAmount,
           vendor: body.vendor ?? null,
           vendorId,
+          stageId: body.stageId ?? null,
           paymentMode: body.paymentMode,
           description: body.description ?? null,
           createdBy: user.id,

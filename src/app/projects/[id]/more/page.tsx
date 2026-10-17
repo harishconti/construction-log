@@ -13,6 +13,7 @@ const ITEMS: MoreItem[] = [
   { href: '/timeline', label: 'Timeline', desc: 'Expenses and diary together', icon: 'timeline' },
   { href: '/diary', label: 'Diary', desc: 'Site observations and photos', icon: 'diary' },
   { href: '/budgets', label: 'Budgets', desc: 'Planned vs actual by week/month', icon: 'budgets' },
+  { href: '/stages', label: 'Stages', desc: 'Build phases and per-stage spend', icon: 'stages' },
 ];
 
 const ADMIN_ITEMS: MoreItem[] = [

@@ -19,6 +19,7 @@ const NAV: Item[] = [
   { href: '/timeline', label: 'Timeline', icon: 'timeline' },
   { href: '/diary', label: 'Diary', icon: 'diary' },
   { href: '/budgets', label: 'Budgets', icon: 'budgets' },
+  { href: '/stages', label: 'Stages', icon: 'stages' },
 ];
 
 const MOBILE_TABS = ['', '/transactions', '/diary'];

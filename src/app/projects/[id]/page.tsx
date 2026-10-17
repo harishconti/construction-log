@@ -8,6 +8,7 @@ import { computeVariance } from '@/lib/budget';
 import { FUNDING_SOURCE_LABEL } from '@/lib/funding';
 import { formatCoords, formatDate, formatDayLabel, formatINR, mapUrl } from '@/lib/format';
 import { periodRange, startOfMonthIST } from '@/lib/period';
+import { listStages } from '@/lib/queries';
 import { prisma } from '@/lib/prisma';
 
 export const dynamic = 'force-dynamic';
@@ -18,10 +19,10 @@ export default async function ProjectDashboard({ params }: { params: Promise<{ i
   const periodStart = startOfMonthIST(new Date());
   const { start, end } = periodRange('month', periodStart);
 
-  const [project, totalAgg, periodAgg, grouped, budgets, categories, recent, recentDiary, fundingAgg, periodFundingAgg, fundingGrouped] = await Promise.all([
+  const [project, totalAgg, periodAgg, grouped, budgets, categories, recent, recentDiary, fundingAgg, periodFundingAgg, fundingGrouped, stages] = await Promise.all([
     prisma.project.findUnique({
       where: { id },
-      select: { name: true, startDate: true, locationName: true, latitude: true, longitude: true },
+      select: { name: true, startDate: true, totalBudget: true, locationName: true, latitude: true, longitude: true },
     }),
     prisma.transaction.aggregate({ where: { projectId: id, deletedAt: null }, _sum: { amount: true }, _count: true }),
     prisma.transaction.aggregate({
@@ -57,6 +58,7 @@ export default async function ProjectDashboard({ params }: { params: Promise<{ i
       where: { projectId: id, deletedAt: null },
       _sum: { amount: true },
     }),
+    listStages(id),
   ]);
 
   const total = Number(totalAgg._sum.amount ?? 0);
@@ -71,6 +73,10 @@ export default async function ProjectDashboard({ params }: { params: Promise<{ i
   const fundingRows = fundingGrouped
     .map((g) => ({ source: g.source, amount: Number(g._sum.amount ?? 0) }))
     .sort((a, b) => b.amount - a.amount);
+
+  const estimate = project?.totalBudget ? Number(project.totalBudget) : null;
+  const estimateVariance = estimate === null ? null : computeVariance(estimate, total);
+  const stagesWithSpend = stages.filter((s) => s.planned > 0 || s.actual > 0);
 
   const nameById = new Map(categories.map((c) => [c.id, c.name]));
   const rows = [...new Set([...budgets.map((b) => b.categoryId), ...grouped.map((g) => g.categoryId)])]
@@ -144,6 +150,14 @@ export default async function ProjectDashboard({ params }: { params: Promise<{ i
           value={formatINR(totalPlanned)}
           badge={variance.status ? <StatusBadge status={usedStatus} /> : undefined}
         />
+        {estimate !== null && (
+          <Stat
+            label="Estimate"
+            value={formatINR(estimate)}
+            sub="total project budget"
+            badge={estimateVariance?.status ? <StatusBadge status={estimateVariance.status} /> : undefined}
+          />
+        )}
       </div>
 
       {/* Funding vs expenditure */}
@@ -227,6 +241,43 @@ export default async function ProjectDashboard({ params }: { params: Promise<{ i
                       percent={r.percentUsed ?? 0}
                       status={(r.status ?? 'green') as BudgetStatus}
                       label={`${r.name} budget used`}
+                    />
+                  </div>
+                )}
+              </li>
+            ))}
+          </ul>
+        </section>
+      )}
+
+      {/* Per-stage progress rows */}
+      {stagesWithSpend.length > 0 && (
+        <section className="rounded-lg border border-border bg-surface p-4">
+          <div className="flex items-center justify-between gap-2">
+            <h2 className="font-display text-lg font-semibold">By stage</h2>
+            <Link href={`/projects/${id}/stages`} className="text-sm text-primary hover:underline">
+              Stages
+            </Link>
+          </div>
+          <ul className="mt-3 space-y-3">
+            {stagesWithSpend.map((s) => (
+              <li key={s.id}>
+                <div className="flex items-center justify-between text-sm">
+                  <span className="font-medium">{s.name}</span>
+                  <span className="flex items-center gap-2">
+                    <span className="num text-ink-2">
+                      {formatINR(s.actual)}
+                      {s.planned > 0 ? ` / ${formatINR(s.planned)}` : ''}
+                    </span>
+                    {s.status && <StatusBadge status={s.status as BudgetStatus} />}
+                  </span>
+                </div>
+                {s.planned > 0 && (
+                  <div className="mt-1">
+                    <ProgressBar
+                      percent={s.percentUsed ?? 0}
+                      status={(s.status ?? 'green') as BudgetStatus}
+                      label={`${s.name} budget used`}
                     />
                   </div>
                 )}

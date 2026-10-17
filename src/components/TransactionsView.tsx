@@ -39,6 +39,8 @@ type Transaction = {
   amount: string;
   gstAmount: string;
   vendor: string | null;
+  vendorId: string | null;
+  stageId: string | null;
   paymentMode: string;
   description: string | null;
   version: number;
@@ -73,12 +75,19 @@ export function TransactionsView({
   projectId: string;
   role: string;
   /** First page (default filters) rendered with the page, so there is no fetch on arrival. */
-  initial?: { items: Transaction[]; pagination: Page; categories: Category[]; vendorNames: string[] };
+  initial?: {
+    items: Transaction[];
+    pagination: Page;
+    categories: Category[];
+    vendorNames: string[];
+    stages: { id: string; name: string }[];
+  };
 }) {
   const toast = useToast();
   const [items, setItems] = useState<Transaction[]>(initial?.items ?? []);
   const [categories, setCategories] = useState<Category[]>(initial?.categories ?? []);
   const [vendorNames, setVendorNames] = useState<string[]>(initial?.vendorNames ?? []);
+  const [stages, setStages] = useState<{ id: string; name: string }[]>(initial?.stages ?? []);
   const [pagination, setPagination] = useState<Page | null>(initial?.pagination ?? null);
   const [loading, setLoading] = useState(!initial);
   const usedInitial = useRef(Boolean(initial));
@@ -129,17 +138,19 @@ export function TransactionsView({
       if (from) qs.set('from', istDateToInstant(from).toISOString());
       if (to) qs.set('to', istDayEnd(to).toISOString());
 
-      const [txRes, catRes, vendorRes] = await Promise.all([
+      const [txRes, catRes, vendorRes, stageRes] = await Promise.all([
         api.get<{ items: Transaction[]; pagination: Page }>(
           `/api/projects/${projectId}/transactions?${qs.toString()}`,
         ),
         api.get<{ categories: Category[] }>(`/api/projects/${projectId}/categories`),
         api.get<{ vendors: { name: string }[] }>(`/api/projects/${projectId}/vendors`),
+        api.get<{ stages: { id: string; name: string }[] }>(`/api/projects/${projectId}/stages`),
       ]);
       setItems(txRes.items);
       setPagination(txRes.pagination);
       setCategories(catRes.categories);
       setVendorNames(vendorRes.vendors.map((v) => v.name));
+      setStages(stageRes.stages.map((s) => ({ id: s.id, name: s.name })));
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Failed to load');
     } finally {
@@ -645,6 +656,7 @@ export function TransactionsView({
           projectId={projectId}
           categories={categories}
           vendorNames={vendorNames}
+          stages={stages}
           entry={sheet.entry}
           isAdmin={isAdmin}
           onClose={() => setSheet({ open: false, entry: null })}
@@ -732,6 +744,7 @@ function TransactionSheet({
   projectId,
   categories,
   vendorNames,
+  stages,
   entry,
   isAdmin,
   onClose,
@@ -743,6 +756,7 @@ function TransactionSheet({
   projectId: string;
   categories: Category[];
   vendorNames: string[];
+  stages: { id: string; name: string }[];
   entry: Transaction | null;
   isAdmin: boolean;
   onClose: () => void;
@@ -756,6 +770,7 @@ function TransactionSheet({
   const [amount, setAmount] = useState(entry ? Number(entry.amount).toString() : '');
   const [gstAmount, setGstAmount] = useState(entry ? Number(entry.gstAmount).toString() : '');
   const [vendor, setVendor] = useState(entry?.vendor ?? '');
+  const [stageId, setStageId] = useState(entry?.stageId ?? '');
   const [paymentMode, setPaymentMode] = useState(entry?.paymentMode ?? 'cash');
   const [description, setDescription] = useState(entry?.description ?? '');
   const [pending, setPending] = useState(false);
@@ -793,6 +808,7 @@ function TransactionSheet({
           amount: Number(amount),
           gstAmount: Number(gstAmount || 0),
           vendor: vendor || null,
+          stageId: stageId || null,
           paymentMode,
           description: description || null,
           version: entry.version,
@@ -809,6 +825,7 @@ function TransactionSheet({
             amount: Number(amount),
             gstAmount: Number(gstAmount || 0),
             vendor: vendor || null,
+            stageId: stageId || null,
             paymentMode,
             description: description || null,
             attachmentIds,
@@ -879,6 +896,19 @@ function TransactionSheet({
             ))}
           </Select>
         </Field>
+
+        {stages.length > 0 && (
+          <Field label="Stage" hint="Optional">
+            <Select value={stageId} onChange={(e) => setStageId(e.target.value)}>
+              <option value="">No stage</option>
+              {stages.map((s) => (
+                <option key={s.id} value={s.id}>
+                  {s.name}
+                </option>
+              ))}
+            </Select>
+          </Field>
+        )}
 
         <Field label="Payment mode">
           <div>
