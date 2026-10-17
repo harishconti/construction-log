@@ -21,7 +21,7 @@ const securityHeaders = [
       "default-src 'self'",
       `img-src 'self' data: blob: ${r2}`,
       "style-src 'self' 'unsafe-inline'",
-      "script-src 'self' 'unsafe-inline'",
+      "script-src 'self' 'unsafe-inline' 'wasm-unsafe-eval'",
       "font-src 'self' data:",
       `connect-src 'self' ${r2}`,
       "frame-ancestors 'none'",
@@ -34,6 +34,9 @@ const securityHeaders = [
 const nextConfig = {
   output: 'standalone',
   reactStrictMode: true,
+  // Native/WASM image tooling must stay out of the server bundle and be required from node_modules
+  // at runtime (sharp ships a libvips binary; heic-convert loads a WASM decoder).
+  serverExternalPackages: ['sharp', 'heic-convert'],
   async headers() {
     return [{ source: '/:path*', headers: securityHeaders }];
   },

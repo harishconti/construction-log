@@ -70,7 +70,11 @@ PWA: `manifest.json` + service worker (`public/sw.js`, registered in production)
   user returning via `?join=1` is joined automatically. Used / revoked / expired links show a clear message.
 - **Authorization**: `requireRole(projectId, userId, minRole)` on every route; project isolation via `projectId` scoping; last-admin safeguard; editor-any transaction edits (admin-only delete/restore); diary author/admin edits, admin delete. The project creator is its first admin. Admins can invite by email before the invitee has an account (pending `Invitation` claimed automatically on first sign-in).
 - **Uploads**: presign → browser PUT direct to R2 → finalize (HeadObject verifies existence/size, magic bytes must match the declared type,
-  re-checks the size cap) → link on create. Images render inline via signed GET; **all other types are
+  re-checks the size cap) → link on create. **Images are compressed on both sides** to avoid R2 bloat: the
+  browser downscales + re-encodes (jpeg/png/webp, and HEIC→JPEG via a WASM decoder) before upload, and
+  finalize re-checks + re-compresses as a server backstop (`sharp`; HEIC via `heic-convert`). PDFs, GIFs
+  and documents are stored as-is (PDF compression needs Ghostscript, which the serverless runtime lacks).
+  Images render inline via signed GET; **all other types are
   download-only** through `GET /api/attachments/:id/download` (`octet-stream`, `attachment`, `nosniff`).
   Type allowlist (jpeg/png/webp/gif inline; pdf/txt/csv/xls/xlsx/heic/heif download-only), 10 MB per
   file, ≤10 per record. Delete removes the object (deferred retry on failure).
@@ -93,8 +97,8 @@ PWA: `manifest.json` + service worker (`public/sw.js`, registered in production)
 - **Maintenance**: reaps `pending` uploads older than 24h, retries deferred R2 deletions (attempt cap + TTL), and processes due account-erasure requests.
 
 ## Verification
-- `npm run typecheck`, `npm run lint`, `npm test` (**155 unit tests**: roles, validation, period/budget
-  math, maintenance auth, file policy, audit regressions, API error mapping/pagination, API client,
+- `npm run typecheck`, `npm run lint`, `npm test` (**162 unit tests**: roles, validation, period/budget
+  math, maintenance auth, file policy + image compression policy, audit regressions, API error mapping/pagination, API client,
   INR/IST/coordinate formatting, DPDP consent schemas + erasure processing, project-location rules, and
   server guards — `requireRole`, rate limit, audit write, idempotency, attachment linking, user-mirror
   first-sign-in race — with Prisma mocked), `npm run build` — all green.

@@ -2,12 +2,17 @@ import { describe, expect, it } from 'vitest';
 import {
   DOCUMENT_MAX_BYTES,
   IMAGE_MAX_BYTES,
+  compressedImageMime,
   extensionFor,
   isAllowedMime,
+  isCompressibleImage,
+  isHeic,
   isViewable,
   kindFor,
+  mayCompress,
   safeDownloadHeaders,
   sanitizeFilename,
+  shouldCompressImage,
   sizeLimitFor,
   sniffMatches,
 } from '../src/lib/files';
@@ -83,6 +88,33 @@ describe('safeDownloadHeaders', () => {
     expect(h['X-Content-Type-Options']).toBe('nosniff');
     expect(h['Cache-Control']).toBe('private, no-store');
     expect(h['Content-Length']).toBe('1234');
+  });
+});
+
+describe('compression policy', () => {
+  it('flags large or oversized images for compression', () => {
+    expect(shouldCompressImage({ mimeType: 'image/jpeg', bytes: 5_000_000, width: 100, height: 100 })).toBe(true);
+    expect(shouldCompressImage({ mimeType: 'image/jpeg', bytes: 100_000, width: 4000, height: 3000 })).toBe(true);
+    expect(shouldCompressImage({ mimeType: 'image/jpeg', bytes: 100_000, width: 800, height: 600 })).toBe(false);
+    expect(shouldCompressImage({ mimeType: 'application/pdf', bytes: 9_000_000, width: 1, height: 1 })).toBe(false);
+  });
+
+  it('excludes GIF from re-encoding but flags HEIC for conversion', () => {
+    expect(isCompressibleImage('image/gif')).toBe(false);
+    expect(isCompressibleImage('image/heic')).toBe(false);
+    expect(isHeic('image/heic')).toBe(true);
+    expect(isHeic('image/heif')).toBe(true);
+    expect(mayCompress('image/heic')).toBe(true);
+    expect(mayCompress('image/png')).toBe(true);
+    expect(mayCompress('image/gif')).toBe(false);
+    expect(mayCompress('application/pdf')).toBe(false);
+  });
+
+  it('preserves alpha only for PNG outputs', () => {
+    expect(compressedImageMime('image/jpeg')).toBe('image/jpeg');
+    expect(compressedImageMime('image/webp')).toBe('image/webp');
+    expect(compressedImageMime('image/png', false)).toBe('image/jpeg');
+    expect(compressedImageMime('image/png', true)).toBe('image/png');
   });
 });
 

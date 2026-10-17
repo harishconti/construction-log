@@ -102,6 +102,20 @@ export async function getObjectHeadBytes(fileKey: string, length = 16): Promise<
   return Buffer.from(bytes);
 }
 
+/** Reads a whole object into memory (used by the post-upload optimiser; only for image-sized data). */
+export async function getObjectBytes(fileKey: string): Promise<Buffer> {
+  const c = config();
+  const res = await s3().send(new GetObjectCommand({ Bucket: c.bucket, Key: fileKey }));
+  const bytes = await res.Body!.transformToByteArray();
+  return Buffer.from(bytes);
+}
+
+/** Overwrites an object in place (used to store the optimised replacement), setting its content type. */
+export async function putObject(fileKey: string, body: Buffer, mimeType: string): Promise<void> {
+  const c = config();
+  await s3().send(new PutObjectCommand({ Bucket: c.bucket, Key: fileKey, Body: body, ContentType: mimeType }));
+}
+
 export async function deleteObject(fileKey: string): Promise<void> {
   const c = config();
   await s3().send(new DeleteObjectCommand({ Bucket: c.bucket, Key: fileKey }));

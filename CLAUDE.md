@@ -53,8 +53,11 @@ only). Use the `/testing` and `/e2e-testing` skills.
 - **Roles**: viewer < editor < admin (per project). Editors edit any transaction; only admins
   delete/restore. Diary: author or admin edits, admin deletes. Keep the last-admin guard.
 - **Uploads**: presign → browser PUT to R2 → finalize (HeadObject + size + magic bytes) → link on create.
-  Non-images are download-only via `/api/attachments/:id/download`. R2 deletes that fail go to the
-  `ObjectDeletion` queue — never drop them.
+  Images are compressed **both sides**: the browser downscales/re-encodes (and converts HEIC→JPEG via
+  WASM) before upload, and `finalize` re-checks + re-compresses as a server backstop (`sharp`, with a
+  WASM HEIC decoder). PDFs/GIFs are left as-is (real PDF compression needs Ghostscript, which Vercel
+  lacks). Non-images are download-only via `/api/attachments/:id/download`. R2 deletes that fail go to
+  the `ObjectDeletion` queue — never drop them.
 - **Schema**: never touch the `neon_auth` schema. Enum-like string columns have DB `CHECK` constraints;
   when adding an enum value, update the zod enum **and** write a migration that alters the CHECK.
   Use the `/prisma-migration` skill.

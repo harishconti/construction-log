@@ -7,6 +7,25 @@ export const MAX_FILES_PER_RECORD = 10;
 export const IMAGE_MAX_BYTES = 10 * 1024 * 1024; // 10 MB
 export const DOCUMENT_MAX_BYTES = 10 * 1024 * 1024; // 10 MB
 
+// ---------------------------------------------------------------------------
+// Compression policy (shared by the browser optimiser and the server finalize step)
+// ---------------------------------------------------------------------------
+
+/** Long-edge target for stored images (px). Large enough that bills stay legible. */
+export const IMAGE_MAX_EDGE = 2000;
+/** Re-encode quality for lossy formats (jpeg/webp), 1–100. */
+export const IMAGE_QUALITY = 82;
+/** Images already below this size are left untouched. */
+export const IMAGE_COMPRESS_MIN_BYTES = 400 * 1024;
+
+/** Types we downscale + re-encode ourselves. GIF is excluded (re-encoding would drop animation). */
+const COMPRESSIBLE_IMAGE_MIME = new Set(['image/jpeg', 'image/png', 'image/webp']);
+/** HEIC/HEIF: converted to JPEG first, then optimised. */
+const HEIC_MIME = new Set(['image/heic', 'image/heif']);
+
+/** The mime a HEIC/HEIF becomes once converted (a viewable JPEG). */
+export const HEIC_OUTPUT_MIME = 'image/jpeg';
+
 /** Raster images safe to render inline in the browser. */
 const VIEWABLE_MIME = new Set(['image/jpeg', 'image/png', 'image/webp', 'image/gif']);
 
@@ -55,6 +74,46 @@ export function sizeLimitFor(mime: string): number {
 
 export function extensionFor(mime: string): string {
   return EXT_BY_MIME[mime] ?? 'bin';
+}
+
+/** A still raster image we can downscale + re-encode (jpeg/png/webp). */
+export function isCompressibleImage(mime: string): boolean {
+  return COMPRESSIBLE_IMAGE_MIME.has(mime);
+}
+
+/** A HEIC/HEIF image, which must be converted before it can be stored as a viewable JPEG. */
+export function isHeic(mime: string): boolean {
+  return HEIC_MIME.has(mime);
+}
+
+/** True for a type the optimiser may rewrite (a compressible image, or HEIC to convert first). */
+export function mayCompress(mime: string): boolean {
+  return isCompressibleImage(mime) || isHeic(mime);
+}
+
+/**
+ * Whether an image is worth re-encoding: larger than the byte floor, or wider/taller than the edge
+ * cap. Pure so the browser and server paths agree and it is unit-testable.
+ */
+export function shouldCompressImage(input: {
+  mimeType: string;
+  bytes: number;
+  width?: number;
+  height?: number;
+}): boolean {
+  if (!isCompressibleImage(input.mimeType)) return false;
+  const longEdge = Math.max(input.width ?? 0, input.height ?? 0);
+  return input.bytes > IMAGE_COMPRESS_MIN_BYTES || longEdge > IMAGE_MAX_EDGE;
+}
+
+/**
+ * Output mime when re-encoding. WebP stays WebP; PNG stays PNG only when it carries transparency
+ * (JPEG would flatten the alpha); everything else becomes JPEG.
+ */
+export function compressedImageMime(mime: string, hasAlpha = false): string {
+  if (mime === 'image/webp') return 'image/webp';
+  if (mime === 'image/png' && hasAlpha) return 'image/png';
+  return 'image/jpeg';
 }
 
 function startsWith(buf: Buffer, bytes: number[], offset = 0): boolean {

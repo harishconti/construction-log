@@ -3,11 +3,22 @@ import { requireUser } from '@/lib/auth';
 import { prisma } from '@/lib/prisma';
 import { requireRole } from '@/lib/requireRole';
 import { writeAudit } from '@/lib/audit';
-import { headObjectSize, isR2Configured, getObjectHeadBytes } from '@/lib/r2';
+import { compressImage } from '@/lib/compress';
+import {
+  getObjectBytes,
+  getObjectHeadBytes,
+  headObjectSize,
+  isR2Configured,
+  putObject,
+} from '@/lib/r2';
 import { serializeAttachment } from '@/lib/serialize';
-import { MAX_FILES_PER_RECORD, sizeLimitFor, sniffMatches } from '@/lib/files';
+import { MAX_FILES_PER_RECORD, mayCompress, sizeLimitFor, sniffMatches } from '@/lib/files';
 import { finalizeAttachmentSchema } from '@/lib/validation/schemas';
 import type { Attachment } from '@prisma/client';
+
+export const runtime = 'nodejs';
+// Server-side optimisation (download + decode + re-encode) can take a few seconds on large images.
+export const maxDuration = 60;
 
 type Ctx = { params: Promise<{ attachmentId: string }> };
 
@@ -60,12 +71,27 @@ export const POST = handle<Ctx>(async (req, { params: paramsPromise }) => {
     throw new ApiError(400, 'CONTENT_MISMATCH', 'File content does not match its declared type');
   }
 
+  // Backstop optimisation: compress (or convert HEIC) server-side so storage never bloats even when
+  // the browser optimiser was skipped. Best-effort — a failure leaves the object as uploaded.
+  let storedMime = attachment.mimeType;
+  let storedSize = size;
+  if (mayCompress(attachment.mimeType)) {
+    const bytes = await getObjectBytes(attachment.fileKey);
+    const optimized = await compressImage(bytes, attachment.mimeType);
+    if (optimized) {
+      await putObject(attachment.fileKey, optimized.bytes, optimized.mimeType);
+      storedMime = optimized.mimeType;
+      storedSize = optimized.bytes.length;
+    }
+  }
+
   const updated = await prisma.$transaction(async (tx) => {
     const res = await tx.attachment.updateMany({
       where: { id: attachment.id, status: 'pending' },
       data: {
         status: 'ready',
-        size,
+        size: storedSize,
+        mimeType: storedMime,
         ...(body.transactionId ? { transactionId: body.transactionId } : {}),
         ...(body.diaryEntryId ? { diaryEntryId: body.diaryEntryId } : {}),
       },
@@ -79,7 +105,13 @@ export const POST = handle<Ctx>(async (req, { params: paramsPromise }) => {
       entityId: attachment.id,
       action: 'finalize',
       actorId: user.id,
-      after: { status: 'ready', size, transactionId: body.transactionId, diaryEntryId: body.diaryEntryId },
+      after: {
+        status: 'ready',
+        size: storedSize,
+        mimeType: storedMime,
+        transactionId: body.transactionId,
+        diaryEntryId: body.diaryEntryId,
+      },
     });
     return tx.attachment.findUniqueOrThrow({ where: { id: attachment.id } });
   });

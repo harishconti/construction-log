@@ -3,6 +3,7 @@
 import { useCallback, useEffect, useRef, useState } from 'react';
 import { Camera, FileSpreadsheet, FileText, RotateCw, Upload, X } from 'lucide-react';
 import { api } from '@/lib/api-client';
+import { compressForUpload } from '@/lib/image-compress';
 import { Button } from '@/components/ui/Button';
 
 export const MAX_FILES = 10;
@@ -10,7 +11,7 @@ export const MAX_FILE_BYTES = 10 * 1024 * 1024;
 const ACCEPT = 'image/*,.pdf,.txt,.csv,.xls,.xlsx';
 
 type ParentType = 'transaction' | 'diary_entry';
-type Status = 'uploading' | 'uploaded' | 'error';
+type Status = 'compressing' | 'uploading' | 'uploaded' | 'error';
 
 export type PendingUpload = {
   key: string;
@@ -60,16 +61,21 @@ export function useUploads(projectId: string, parentType: ParentType, existingCo
 
   const start = useCallback(
     async (item: PendingUpload) => {
-      patch(item.key, { status: 'uploading', progress: 0, error: undefined });
+      patch(item.key, { status: 'compressing', progress: 0, error: undefined });
       try {
+        // Optimise in the browser first: a phone photo shrinks from many MB to a few hundred KB before
+        // it ever leaves the device. The server re-checks and re-compresses at finalize as a backstop.
+        const file = await compressForUpload(item.file);
+        if (file !== item.file) patch(item.key, { file });
+        patch(item.key, { status: 'uploading' });
         const presign = await api.post<{ uploadUrl: string; attachmentId: string }>('/api/uploads/presign', {
           projectId,
           parentType,
-          filename: item.file.name,
-          mimeType: item.file.type || 'application/octet-stream',
-          size: item.file.size,
+          filename: file.name,
+          mimeType: file.type || 'application/octet-stream',
+          size: file.size,
         });
-        await putWithProgress(presign.uploadUrl, item.file, (progress) => patch(item.key, { progress }));
+        await putWithProgress(presign.uploadUrl, file, (progress) => patch(item.key, { progress }));
         patch(item.key, { status: 'uploaded', progress: 100, attachmentId: presign.attachmentId });
       } catch (err) {
         patch(item.key, { status: 'error', error: err instanceof Error ? err.message : 'Upload failed' });
@@ -118,7 +124,7 @@ export function useUploads(projectId: string, parentType: ParentType, existingCo
     [start],
   );
 
-  const busy = items.some((i) => i.status === 'uploading');
+  const busy = items.some((i) => i.status === 'uploading' || i.status === 'compressing');
   const failed = items.some((i) => i.status === 'error');
 
   /** Finalize every uploaded file; returns their attachment ids. */
@@ -181,7 +187,7 @@ export function UploadPicker({
       </div>
       <input ref={cameraRef} type="file" accept="image/*" capture="environment" className="hidden" onChange={onPick} />
       <input ref={uploadRef} type="file" accept={ACCEPT} multiple className="hidden" onChange={onPick} />
-      <p className="mt-1 text-xs text-ink-3">Up to {MAX_FILES} files, 10 MB each. Images open in the app; PDFs and spreadsheets download.</p>
+      <p className="mt-1 text-xs text-ink-3">Up to {MAX_FILES} files, 10 MB each. Photos are compressed automatically. Images open in the app; PDFs and spreadsheets download.</p>
 
       {uploads.items.length > 0 && (
         <ul className="mt-3 space-y-2">
@@ -202,19 +208,22 @@ export function UploadPicker({
                   {i.status === 'error' ? (
                     <p className="text-xs text-danger">{i.error ?? 'Upload failed'}</p>
                   ) : (
-                    <div
-                      className="mt-1 h-1.5 w-full overflow-hidden rounded-full bg-surface-2"
-                      role="progressbar"
-                      aria-label={`Uploading ${i.file.name}`}
-                      aria-valuenow={i.progress}
-                      aria-valuemin={0}
-                      aria-valuemax={100}
-                    >
+                    <>
+                      {i.status === 'compressing' && <p className="text-xs text-ink-3">Optimising…</p>}
                       <div
-                        className="h-full rounded-full transition-[width]"
-                        style={{ width: `${i.progress}%`, backgroundColor: i.status === 'uploaded' ? 'var(--ok)' : 'var(--primary)' }}
-                      />
-                    </div>
+                        className="mt-1 h-1.5 w-full overflow-hidden rounded-full bg-surface-2"
+                        role="progressbar"
+                        aria-label={`Uploading ${i.file.name}`}
+                        aria-valuenow={i.progress}
+                        aria-valuemin={0}
+                        aria-valuemax={100}
+                      >
+                        <div
+                          className="h-full rounded-full transition-[width]"
+                          style={{ width: `${i.progress}%`, backgroundColor: i.status === 'uploaded' ? 'var(--ok)' : 'var(--primary)' }}
+                        />
+                      </div>
+                    </>
                   )}
                 </div>
                 {i.status === 'error' && (
