@@ -7,6 +7,7 @@ import { writeAudit } from '@/lib/audit';
 import { withIdempotency } from '@/lib/idempotency';
 import { linkAttachments } from '@/lib/attachments';
 import { listTransactions, serializeTransaction } from '@/lib/queries';
+import { resolveVendorId } from '@/lib/vendors';
 import {
   createTransactionSchema,
   paymentModeSchema,
@@ -62,6 +63,11 @@ export const POST = handle<Ctx>(async (req, { params: paramsPromise }) => {
   const { data: transaction } = await withIdempotency(
     { projectId: params.id, userId: user.id, key: req.headers.get('idempotency-key'), body },
     async (tx) => {
+      const vendorId = await resolveVendorId(tx, {
+        projectId: params.id,
+        createdBy: user.id,
+        name: body.vendor,
+      });
       const created = await tx.transaction.create({
         data: {
           projectId: params.id,
@@ -70,11 +76,15 @@ export const POST = handle<Ctx>(async (req, { params: paramsPromise }) => {
           amount: body.amount,
           gstAmount: body.gstAmount,
           vendor: body.vendor ?? null,
+          vendorId,
           paymentMode: body.paymentMode,
           description: body.description ?? null,
           createdBy: user.id,
         },
-        include: { category: { select: { id: true, name: true, type: true } } },
+        include: {
+          category: { select: { id: true, name: true, type: true } },
+          vendorEntity: { select: { id: true, name: true } },
+        },
       });
 
       if (body.attachmentIds?.length) {

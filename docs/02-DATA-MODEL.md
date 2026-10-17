@@ -93,6 +93,28 @@ model Category {
   @@unique([projectId, name])
 }
 
+model Vendor {
+  id            String   @id @default(cuid())
+  projectId     String
+  name          String
+  phone         String?
+  trade         String?  // e.g. "Mason", "Electrician"
+  contractValue Decimal? @db.Decimal(12, 2) // optional agreed value of the work
+  notes         String?
+  isActive      Boolean  @default(true)
+  version       Int      @default(0)
+  createdBy     String
+  createdAt     DateTime @default(now())
+  updatedAt     DateTime @updatedAt
+
+  project       Project       @relation(fields: [projectId], references: [id], onDelete: Cascade)
+  createdByUser User          @relation(fields: [createdBy], references: [id])
+  transactions  Transaction[]
+
+  @@unique([projectId, name])
+  @@index([projectId, isActive])
+}
+
 model Transaction {
   id          String    @id @default(cuid())
   projectId   String
@@ -100,7 +122,8 @@ model Transaction {
   occurredAt  DateTime
   amount      Decimal   @db.Decimal(12, 2) // GST-inclusive total
   gstAmount   Decimal   @default(0) @db.Decimal(12, 2) // tax component already inside `amount`
-  vendor      String?
+  vendor      String?   // name snapshot (kept in sync with `vendorEntity` on read)
+  vendorId    String?   // linked Vendor, resolved from the name
   paymentMode String    // 'cash' | 'upi' | 'bank' | 'card' | 'credit'
   description String?
   version     Int       @default(0) // optimistic locking (to implement)
@@ -111,11 +134,13 @@ model Transaction {
 
   project       Project      @relation(fields: [projectId], references: [id], onDelete: Cascade)
   category      Category     @relation(fields: [categoryId], references: [id])
+  vendorEntity  Vendor?      @relation(fields: [vendorId], references: [id], onDelete: SetNull)
   createdByUser User         @relation(fields: [createdBy], references: [id])
   attachments   Attachment[]
 
   @@index([projectId, occurredAt])
   @@index([projectId, categoryId])
+  @@index([projectId, vendorId])
   @@index([createdBy])
 }
 
@@ -327,6 +352,11 @@ model DeletionRequest {
   expenditure ledger clean; each row has a fixed `source`, an optional free-text party, an amount, a
   received date, a payment `mode` and an optional R2 proof. The dashboard compares funding received with
   spend to show a balance and the share of funding used.
+- **Vendors are resolved from the name** — `Transaction.vendor` stays a free-text name (so existing data
+  and clients are untouched), but every create/update also upserts a `Vendor` on the
+  `(projectId, name)` key and links it via `vendorId`. Per-vendor totals, and the balance against an
+  optional `contractValue`, are then derived (`SUM(amount)`), never stored. A migration backfills
+  vendors and links for names already in the ledger.
 - **Two-phase upload** — `pending` row at presign, `ready` after the object is verified. A scheduled
   job reclaims orphaned `pending` rows and retries R2 deletions.
 - **Pending invitations** — an admin can invite an email before that person has an account; the
@@ -364,7 +394,7 @@ model DeletionRequest {
 Implemented (migrations under `prisma/migrations`: `init`, `attachment_parent_check`,
 `idempotency_response`, `object_deletion_queue`, `attachment_original_name`, `invitations`,
 `invitation_expiry`, `rate_limit`, `enum_checks`, `invite_links`, `consent_and_deletion`,
-`project_location`, `funding`, `project_archive`): `User.id` = Neon Auth id with no `passwordHash` (and `deletedAt` for erased
+`project_location`, `funding`, `project_archive`, `vendors`): `User.id` = Neon Auth id with no `passwordHash` (and `deletedAt` for erased
 accounts); `version` columns on Project/Transaction/Funding/DiaryEntry/Budget; `Attachment` with
 `transactionId`/`diaryEntryId`/`fundingId`/`status`/`size`/`originalName`; the `attachment_parent_check` and
 `attachment_status_check` CHECK constraints; `IdempotencyKey` with a stored `response`; `ObjectDeletion`

@@ -127,6 +127,28 @@ export const updateCategorySchema = z.object({
 });
 
 // ---------------------------------------------------------------------------
+// Vendors (suppliers / contractors)
+// ---------------------------------------------------------------------------
+
+export const createVendorSchema = z.object({
+  name: z.string().trim().min(1).max(200),
+  phone: z.string().trim().max(40).optional().nullable(),
+  trade: z.string().trim().max(80).optional().nullable(),
+  contractValue: moneyNonNegative.optional().nullable(),
+  notes: z.string().trim().max(2000).optional().nullable(),
+});
+
+export const updateVendorSchema = z.object({
+  name: z.string().trim().min(1).max(200).optional(),
+  phone: z.string().trim().max(40).optional().nullable(),
+  trade: z.string().trim().max(80).optional().nullable(),
+  contractValue: moneyNonNegative.optional().nullable(),
+  notes: z.string().trim().max(2000).optional().nullable(),
+  isActive: z.boolean().optional(),
+  version: z.number().int().min(0).optional(),
+});
+
+// ---------------------------------------------------------------------------
 // Transactions
 // ---------------------------------------------------------------------------
 
@@ -347,6 +369,8 @@ export type UpdateProjectInput = z.infer<typeof updateProjectSchema>;
 export type AddMemberInput = z.infer<typeof addMemberSchema>;
 export type CreateCategoryInput = z.infer<typeof createCategorySchema>;
 export type UpdateCategoryInput = z.infer<typeof updateCategorySchema>;
+export type CreateVendorInput = z.infer<typeof createVendorSchema>;
+export type UpdateVendorInput = z.infer<typeof updateVendorSchema>;
 export type CreateTransactionInput = z.infer<typeof createTransactionSchema>;
 export type UpdateTransactionInput = z.infer<typeof updateTransactionSchema>;
 export type CreateFundingInput = z.infer<typeof createFundingSchema>;

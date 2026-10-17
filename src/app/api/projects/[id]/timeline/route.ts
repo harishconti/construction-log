@@ -50,7 +50,10 @@ export const GET = handle<Ctx>(async (req, { params: paramsPromise }) => {
       where: { projectId: params.id, deletedAt: null, ...(hasRange ? { occurredAt: range } : {}) },
       orderBy: [{ occurredAt: 'desc' }, { id: 'desc' }],
       take: limit + 1,
-      include: { category: { select: { id: true, name: true, type: true } } },
+      include: {
+        category: { select: { id: true, name: true, type: true } },
+        vendorEntity: { select: { id: true, name: true } },
+      },
     }),
     prisma.funding.findMany({
       where: { projectId: params.id, deletedAt: null, ...(hasRange ? { receivedAt: range } : {}) },
@@ -72,7 +75,7 @@ export const GET = handle<Ctx>(async (req, { params: paramsPromise }) => {
       date: t.occurredAt,
       amount: t.amount.toString(),
       gstAmount: t.gstAmount.toString(),
-      vendor: t.vendor,
+      vendor: t.vendorEntity?.name ?? t.vendor,
       paymentMode: t.paymentMode,
       description: t.description,
       category: t.category,

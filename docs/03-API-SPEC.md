@@ -68,6 +68,19 @@ member of project A cannot read or write project B.
 > **Permission note:** editors may create and edit **any** transaction in the project; only admins
 > may soft-delete or restore. (Current code enforces "own only" — reconcile to "any" _(to implement)_.)
 
+## Vendors (suppliers / contractors)
+| Method | Path | Description | Min Role |
+|---|---|---|---|
+| GET | /api/projects/:id/vendors | List vendors with paid totals and a contract balance (`?includeInactive=true`) | viewer |
+| POST | /api/projects/:id/vendors | Create vendor | editor |
+| PATCH | /api/projects/:id/vendors/:vendorId | Update (name, phone, trade, contract value, notes, active) | editor |
+| DELETE | /api/projects/:id/vendors/:vendorId | Delete a vendor that has no transactions (`409 VENDOR_IN_USE` otherwise) | admin |
+
+> Transactions link to a vendor **by name**: creating or editing an expense with a `vendor` name upserts
+> the `Vendor` for that project (`@@unique([projectId, name])`, trimmed) and links it, so per-vendor
+> totals work without a separate picker. Renaming a vendor changes how its transactions are displayed.
+> `balance` = contractValue − paid (null when no contract value is set).
+
 ## Funding (money in)
 | Method | Path | Description | Min Role |
 |---|---|---|---|

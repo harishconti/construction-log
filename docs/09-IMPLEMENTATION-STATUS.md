@@ -11,7 +11,7 @@ This document reflects the **actual repository state**. For the target design se
 - **Vercel** target; `build` runs `prisma generate && next build`; Node `22.x`; daily cleanup cron (`vercel.json`).
 
 ## Data model (implemented)
-`User, Project, ProjectMember, Invitation, Category, Transaction, Funding, DiaryEntry, Attachment, Budget, BudgetRevision,
+`User, Project, ProjectMember, Invitation, Category, Vendor, Transaction, Funding, DiaryEntry, Attachment, Budget, BudgetRevision,
 AuditLog, IdempotencyKey, ObjectDeletion, RateLimit, ConsentRecord, DeletionRequest`.
 
 Key properties in place:
@@ -27,7 +27,7 @@ Key properties in place:
 
 Migrations: `init`, `attachment_parent_check`, `idempotency_response`, `object_deletion_queue`,
 `attachment_original_name`, `invitations`, `invitation_expiry`, `rate_limit`, `enum_checks`, `invite_links`,
-`consent_and_deletion`, `project_location`, `funding`, `project_archive`
+`consent_and_deletion`, `project_location`, `funding`, `project_archive`, `vendors`
 (applied to the Neon `dev` branch; **apply to production before deploying** the funding code).
 
 ## API endpoints (implemented)
@@ -37,6 +37,7 @@ Migrations: `init`, `attachment_parent_check`, `idempotency_response`, `object_d
 | Projects | `GET/POST /api/projects`; `GET/PATCH/DELETE /api/projects/:id`; `POST …/archive`; `POST …/unarchive` |
 | Members | `GET/POST /api/projects/:id/members`; `PATCH/DELETE /api/projects/:id/members/:userId`; `DELETE /api/projects/:id/invitations/:invitationId`; `GET/POST /api/projects/:id/invite-links`; `DELETE /api/projects/:id/invite-links/:linkId`; `POST /api/invite-links/:token/accept` |
 | Categories | `GET/POST /api/projects/:id/categories`; `PATCH /api/projects/:id/categories/:catId` |
+| Vendors | `GET/POST /api/projects/:id/vendors`; `PATCH/DELETE /api/projects/:id/vendors/:vendorId` |
 | Transactions | `GET/POST /api/projects/:id/transactions`; `PATCH/DELETE /api/projects/:id/transactions/:txId`; `POST …/restore` |
 | Funding | `GET/POST /api/projects/:id/funding`; `PATCH/DELETE /api/projects/:id/funding/:fundingId`; `POST …/restore` |
 | Diary | `GET/POST /api/projects/:id/diary`; `PATCH/DELETE /api/projects/:id/diary/:entryId` |
@@ -54,6 +55,7 @@ expenses, budgets, diary, team, use cases, data) · `/consent` (consent gate for
 after a policy-version change) · `/account` (consent status, optional-purpose preferences and the
 account-deletion flow) · `/projects` (list/create, archived projects in a separate section) · `/projects/:id`
 (Dashboard + chart + funding-vs-expenditure) · `/transactions` (filters, pagination, add/edit, admin soft-delete/restore) ·
+`/vendors` (contractors/suppliers: paid totals, contract balance, add/edit, active/inactive) ·
 `/funding` (money in: sources, filters, pagination, add/edit, admin soft-delete/restore) ·
 `/timeline` (funding, expenses and diary together) · `/diary` (author/admin edit with add/remove photos, admin delete) · `/budgets` ·
 `/more` (mobile menu) · `/members` (admin) · `/settings` (admin, project + categories + archive/delete).
@@ -93,6 +95,10 @@ PWA: `manifest.json` + service worker (`public/sw.js`, registered in production)
   objects are queued to `ObjectDeletion`). Archiving is a nullable `Project.archivedAt`, so it composes
   with `active`/`paused`/`completed`. GST is tracked as the per-expense `gstAmount` field, not a
   category, so totals never double-count it.
+- **Vendors**: expenses auto-link to a `Vendor` (created on first use from the vendor name), so each
+  contractor has a running total; an optional contract value gives a balance (agreed − paid). The
+  `/vendors` page lists them, and the expense form suggests known names. Renaming a vendor updates how
+  its transactions read; a vendor with transactions can be deactivated but not deleted (409).
 - **Time**: `Asia/Kolkata` boundaries; weeks start Monday.
 - **Consent & erasure (DPDP, 2023)**: the app shell (`/projects`, every project page) sends a signed-in
   user with no consent for the current `POLICY_VERSION` through `/consent`, which lists each purpose
@@ -110,8 +116,9 @@ PWA: `manifest.json` + service worker (`public/sw.js`, registered in production)
 - **Maintenance**: reaps `pending` uploads older than 24h, retries deferred R2 deletions (attempt cap + TTL), and processes due account-erasure requests.
 
 ## Verification
-- `npm run typecheck`, `npm run lint`, `npm test` (**178 unit tests**: roles, validation, period/budget
+- `npm run typecheck`, `npm run lint`, `npm test` (**187 unit tests**: roles, validation, period/budget
   math, maintenance auth, file policy + image compression policy, funding source/category vocabulary,
+  vendor resolution + schemas,
   audit regressions, API error mapping/pagination, API client,
   INR/IST/coordinate formatting, DPDP consent schemas + erasure processing, project-location rules, and
   server guards — `requireRole`, rate limit, audit write, idempotency, attachment linking, user-mirror

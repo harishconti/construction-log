@@ -6,6 +6,7 @@ import {
   BookOpen,
   CalendarDays,
   ChevronRight,
+  HardHat,
   LayoutDashboard,
   LogOut,
   PiggyBank,
@@ -20,6 +21,7 @@ import { authClient } from '@/lib/auth/client';
 const ICONS: Record<string, LucideIcon> = {
   dashboard: LayoutDashboard,
   transactions: Receipt,
+  vendors: HardHat,
   funding: PiggyBank,
   timeline: CalendarDays,
   diary: BookOpen,

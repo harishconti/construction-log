@@ -133,6 +133,25 @@ test('admin soft-deletes from the edit sheet and can Undo', async ({ page }) => 
   await expect(page.getByText('Expense restored')).toBeVisible();
 });
 
+test('the vendor is tracked with a running total and an optional contract balance', async ({ request }) => {
+  const list = await (await request.get(`/api/projects/${projectId}/vendors`)).json();
+  const v = list.vendors.find((x: { name: string }) => x.name === vendor);
+  expect(v, 'vendor auto-created from the expense').toBeTruthy();
+  expect(v.paid).toBe(1750);
+  expect(v.transactionCount).toBe(1);
+
+  const patched = await request.patch(`/api/projects/${projectId}/vendors/${v.id}`, {
+    data: { contractValue: 2000, trade: 'Mason', version: v.version },
+  });
+  expect(patched.status()).toBe(200);
+
+  const after = (await (await request.get(`/api/projects/${projectId}/vendors`)).json()).vendors.find(
+    (x: { id: string }) => x.id === v.id,
+  );
+  expect(after.contractValue).toBe('2000');
+  expect(after.balance).toBe(250); // 2000 agreed − 1750 paid
+});
+
 test('add a diary entry', async ({ page }) => {
   await page.goto(`/projects/${projectId}/diary`);
   await page.getByRole('button', { name: 'Add diary entry' }).click();

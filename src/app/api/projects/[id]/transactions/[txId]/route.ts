@@ -3,6 +3,7 @@ import { requireUser } from '@/lib/auth';
 import { prisma } from '@/lib/prisma';
 import { requireRole } from '@/lib/requireRole';
 import { writeAudit } from '@/lib/audit';
+import { resolveVendorId } from '@/lib/vendors';
 import { updateTransactionSchema } from '@/lib/validation/schemas';
 
 type Ctx = { params: Promise<{ id: string; txId: string }> };
@@ -35,6 +36,10 @@ export const PATCH = handle<Ctx>(async (req, { params: paramsPromise }) => {
   }
 
   const updated = await prisma.$transaction(async (tx) => {
+    const vendorId =
+      body.vendor !== undefined
+        ? await resolveVendorId(tx, { projectId, createdBy: user.id, name: body.vendor })
+        : undefined;
     const res = await tx.transaction.updateMany({
       where: { id: txId, version: before.version },
       data: {
@@ -43,6 +48,7 @@ export const PATCH = handle<Ctx>(async (req, { params: paramsPromise }) => {
         ...(body.amount !== undefined ? { amount: body.amount } : {}),
         ...(body.gstAmount !== undefined ? { gstAmount: body.gstAmount } : {}),
         ...(body.vendor !== undefined ? { vendor: body.vendor } : {}),
+        ...(vendorId !== undefined ? { vendorId } : {}),
         ...(body.paymentMode !== undefined ? { paymentMode: body.paymentMode } : {}),
         ...(body.description !== undefined ? { description: body.description } : {}),
         version: { increment: 1 },
@@ -53,7 +59,10 @@ export const PATCH = handle<Ctx>(async (req, { params: paramsPromise }) => {
     }
     const after = await tx.transaction.findUnique({
       where: { id: txId },
-      include: { category: { select: { id: true, name: true, type: true } } },
+      include: {
+        category: { select: { id: true, name: true, type: true } },
+        vendorEntity: { select: { id: true, name: true } },
+      },
     });
     await writeAudit(tx, {
       entity: 'transaction',

@@ -5,6 +5,7 @@ import { usePathname } from 'next/navigation';
 import {
   BookOpen,
   CalendarDays,
+  HardHat,
   LayoutDashboard,
   MoreHorizontal,
   PiggyBank,
@@ -18,6 +19,7 @@ import {
 const ICONS: Record<string, LucideIcon> = {
   dashboard: LayoutDashboard,
   transactions: Receipt,
+  vendors: HardHat,
   funding: PiggyBank,
   timeline: CalendarDays,
   diary: BookOpen,

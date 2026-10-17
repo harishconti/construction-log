@@ -73,11 +73,12 @@ export function TransactionsView({
   projectId: string;
   role: string;
   /** First page (default filters) rendered with the page, so there is no fetch on arrival. */
-  initial?: { items: Transaction[]; pagination: Page; categories: Category[] };
+  initial?: { items: Transaction[]; pagination: Page; categories: Category[]; vendorNames: string[] };
 }) {
   const toast = useToast();
   const [items, setItems] = useState<Transaction[]>(initial?.items ?? []);
   const [categories, setCategories] = useState<Category[]>(initial?.categories ?? []);
+  const [vendorNames, setVendorNames] = useState<string[]>(initial?.vendorNames ?? []);
   const [pagination, setPagination] = useState<Page | null>(initial?.pagination ?? null);
   const [loading, setLoading] = useState(!initial);
   const usedInitial = useRef(Boolean(initial));
@@ -128,15 +129,17 @@ export function TransactionsView({
       if (from) qs.set('from', istDateToInstant(from).toISOString());
       if (to) qs.set('to', istDayEnd(to).toISOString());
 
-      const [txRes, catRes] = await Promise.all([
+      const [txRes, catRes, vendorRes] = await Promise.all([
         api.get<{ items: Transaction[]; pagination: Page }>(
           `/api/projects/${projectId}/transactions?${qs.toString()}`,
         ),
         api.get<{ categories: Category[] }>(`/api/projects/${projectId}/categories`),
+        api.get<{ vendors: { name: string }[] }>(`/api/projects/${projectId}/vendors`),
       ]);
       setItems(txRes.items);
       setPagination(txRes.pagination);
       setCategories(catRes.categories);
+      setVendorNames(vendorRes.vendors.map((v) => v.name));
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Failed to load');
     } finally {
@@ -641,6 +644,7 @@ export function TransactionsView({
         <TransactionSheet
           projectId={projectId}
           categories={categories}
+          vendorNames={vendorNames}
           entry={sheet.entry}
           isAdmin={isAdmin}
           onClose={() => setSheet({ open: false, entry: null })}
@@ -727,6 +731,7 @@ function FilterChip({ label, onClear }: { label: string; onClear: () => void }) 
 function TransactionSheet({
   projectId,
   categories,
+  vendorNames,
   entry,
   isAdmin,
   onClose,
@@ -737,6 +742,7 @@ function TransactionSheet({
 }: {
   projectId: string;
   categories: Category[];
+  vendorNames: string[];
   entry: Transaction | null;
   isAdmin: boolean;
   onClose: () => void;
@@ -881,8 +887,18 @@ function TransactionSheet({
         </Field>
 
         <Field label="Vendor">
-          <TextInput value={vendor} onChange={(e) => setVendor(e.target.value)} placeholder="Optional" />
+          <TextInput
+            value={vendor}
+            onChange={(e) => setVendor(e.target.value)}
+            placeholder="Optional"
+            list="vendor-names"
+          />
         </Field>
+        <datalist id="vendor-names">
+          {vendorNames.map((n) => (
+            <option key={n} value={n} />
+          ))}
+        </datalist>
 
         <Field label="Notes">
           <Textarea value={description} onChange={(e) => setDescription(e.target.value)} placeholder="Optional" />

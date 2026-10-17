@@ -33,11 +33,21 @@ async function attachmentsBy(
 }
 
 type TransactionRow = Prisma.TransactionGetPayload<{
-  include: { category: { select: { id: true; name: true; type: true } } };
+  include: {
+    category: { select: { id: true; name: true; type: true } };
+    vendorEntity: { select: { id: true; name: true } };
+  };
 }>;
 
 export function serializeTransaction(t: TransactionRow) {
-  return { ...t, amount: t.amount.toString(), gstAmount: t.gstAmount.toString() };
+  const { vendorEntity, ...rest } = t;
+  return {
+    ...rest,
+    // Prefer the linked vendor's current name; fall back to the free-text snapshot.
+    vendor: vendorEntity?.name ?? t.vendor,
+    amount: t.amount.toString(),
+    gstAmount: t.gstAmount.toString(),
+  };
 }
 
 export type TransactionFilters = {
@@ -68,7 +78,10 @@ export async function listTransactions(projectId: string, f: TransactionFilters 
       orderBy: [{ occurredAt: 'desc' }, { createdAt: 'desc' }],
       skip: paging.skip,
       take: paging.take,
-      include: { category: { select: { id: true, name: true, type: true } } },
+      include: {
+        category: { select: { id: true, name: true, type: true } },
+        vendorEntity: { select: { id: true, name: true } },
+      },
     }),
   ]);
 
@@ -144,6 +157,69 @@ export async function listCategories(projectId: string, includeInactive = false)
     where: { projectId, ...(includeInactive ? {} : { isActive: true }) },
     orderBy: { name: 'asc' },
     select: { id: true, name: true, type: true, isActive: true },
+  });
+}
+
+export type VendorSummary = {
+  id: string;
+  name: string;
+  phone: string | null;
+  trade: string | null;
+  contractValue: string | null;
+  notes: string | null;
+  isActive: boolean;
+  version: number;
+  /** Sum of this vendor's non-deleted transactions. */
+  paid: number;
+  transactionCount: number;
+  /** contractValue − paid (positive = still to pay); null when no contract value is set. */
+  balance: number | null;
+};
+
+/** Vendors with derived totals: what has been paid, and the balance against an optional contract value. */
+export async function listVendors(projectId: string, includeInactive = false): Promise<VendorSummary[]> {
+  const vendors = await prisma.vendor.findMany({
+    where: { projectId, ...(includeInactive ? {} : { isActive: true }) },
+    orderBy: { name: 'asc' },
+    select: {
+      id: true,
+      name: true,
+      phone: true,
+      trade: true,
+      contractValue: true,
+      notes: true,
+      isActive: true,
+      version: true,
+    },
+  });
+
+  const ids = vendors.map((v) => v.id);
+  const grouped = ids.length
+    ? await prisma.transaction.groupBy({
+        by: ['vendorId'],
+        where: { projectId, vendorId: { in: ids }, deletedAt: null },
+        _sum: { amount: true },
+        _count: true,
+      })
+    : [];
+  const byId = new Map(grouped.map((g) => [g.vendorId, { paid: Number(g._sum.amount ?? 0), count: g._count }]));
+
+  return vendors.map((v) => {
+    const paid = byId.get(v.id)?.paid ?? 0;
+    const contractValue = v.contractValue === null ? null : Number(v.contractValue);
+    return {
+      id: v.id,
+      name: v.name,
+      phone: v.phone,
+      trade: v.trade,
+      notes: v.notes,
+      isActive: v.isActive,
+      version: v.version,
+      contractValue: v.contractValue === null ? null : v.contractValue.toString(),
+      paid,
+      transactionCount: byId.get(v.id)?.count ?? 0,
+      balance: contractValue === null ? null : contractValue - paid,
+    };
   });
 }
 
